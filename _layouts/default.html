@@ -9,6 +9,7 @@ layout: compress
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     {{ seo }}
+    {% if paginator.previous_page -%}<meta name="robots" content="noindex"/>{%- endif %}
     <link rel="icon" type="image/x-icon" href="{{ "/images/favicon.ico" | relative_url }}"/>
     <link rel="shortcut icon" type="image/x-icon" href="{{ "/images/favicon.ico" | relative_url }}" media="screen"/>
     <link rel="apple-touch-icon" type="image/x-icon" href="{{ "/images/apple-touch-icon.png" | relative_url }}"/>
