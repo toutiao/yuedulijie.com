@@ -5,10 +5,22 @@ layout: compress
 <!DOCTYPE html>
 <html lang="{{ page.lang | default: site.lang | default: "en" }}">
   <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     {{ seo }}
+    <link rel="icon" type="image/x-icon" href="{{ "/images/favicon.ico" | relative_url }}"/>
+    <link rel="shortcut icon" type="image/x-icon" href="{{ "/images/favicon.ico" | relative_url }}" media="screen"/>
+    <link rel="apple-touch-icon" type="image/x-icon" href="{{ "/images/apple-touch-icon.png" | relative_url }}"/>
+
+    <link rel="stylesheet" media="all" href="{{ "/assets/main.css?v=" | append: site.github.build_revision | relative_url }}" data-turbolinks-track="reload" />
   </head>
   <body>
     {{ content }}
+    <script async src="{{ "/assets/main.js?v=" | append: site.github.build_revision | relative_url }}" data-turbolinks-track="reload"></script>
+    {%- if jekyll.environment == 'production' and site.google_analytics -%}
+    {% include google-analytics.html -%}
+    {%- endif -%}
   </body>
 </html>{% if site.github %}<!--
 environment: {{ site.github.environment }}
