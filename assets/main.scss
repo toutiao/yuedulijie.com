@@ -61,6 +61,10 @@ header {
     .navbar-brand {
       font-weight: 400;
 
+      &:hover:bedofe, &:hover:after {
+        color: #ccc;
+      }
+
       &:before, &:after {
         color: #aaa;
         padding: .25rem;
