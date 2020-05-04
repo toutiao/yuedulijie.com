@@ -1,3 +1,9 @@
 ---
 layout: default
 ---
+
+<main class="container">
+  <h2>{{ page.title | escape }}</h2>
+
+  {% include posts.html posts=site.posts -%}
+</main>

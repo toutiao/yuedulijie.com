@@ -92,6 +92,45 @@ header {
   }
 }
 
+main.container {
+  overflow: hidden;
+  max-width: 40em;
+  margin: 0 auto;
+  padding: 0 1.5em;
+
+  h2 {
+    font-size: 2em;
+    margin: 2.5em 0 1.25em 0;
+    text-align: center;
+  }
+
+  .year h3 {
+    font-size: 1.5em;
+    margin: 2em 0 1em 0;
+    text-align: center;
+  }
+  .month h4 {
+    margin: 2em 0 1em 0;
+    text-align: center;
+  }
+  .day-title {
+    display: flex;
+    align-items: flex-start;
+    border-bottom: 1px solid #eee;
+    padding: 10px 0;
+
+    .day p {
+      padding-right: 2rem;
+      margin: 0;
+      width: 2.5rem;
+    }
+
+    .post-title p {
+      margin: 0;
+    }
+  }
+}
+
 article main {
   a {
     &:link, &:visited, &:visited {
