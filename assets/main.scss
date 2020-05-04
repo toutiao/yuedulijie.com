@@ -17,7 +17,7 @@ body {
     font-size: 100%;
     vertical-align: baseline;
     background: transparent;
-  
+
     &:link, &:visited, &:hover {
       color: #333;
       text-decoration: none;
@@ -28,7 +28,7 @@ body {
       -o-transition: all .3s linear;
       transition: all .3s linear;
     }
-  
+
     &:hover {
       color: #aaa;
     }
@@ -60,6 +60,17 @@ header {
 
     .navbar-brand {
       font-weight: 400;
+
+      &:before, &:after {
+        color: #aaa;
+        padding: .25rem;
+      }
+      &:before {
+        content: "「";
+      }
+      &:after {
+        content: "」";
+      }
     }
 
     .navbar-nav {
