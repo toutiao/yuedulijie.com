@@ -35,6 +35,47 @@ body {
   }
 }
 
+header {
+  border-bottom: 1px solid #f5f5f5;
+  text-transform: lowercase;
+
+  &.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+  }
+
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    align-content: center;
+    flex-wrap: nowrap;
+    height: 96px;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      padding-bottom: 4px;
+    }
+
+    .navbar-brand {
+      font-weight: 400;
+    }
+
+    .navbar-nav {
+      font-weight: 300;
+
+      .nav-item {
+        padding: 0 15px;
+
+        &.active {
+          opacity: .87;
+        }
+      }
+    }
+  }
+}
+
 article main {
   a {
     &:link, &:visited, &:visited {
