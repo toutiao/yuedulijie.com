@@ -5,3 +5,16 @@ url: "https://yuedulijie.com"
 
 timezone: Asia/Shanghai
 encoding: utf-8
+
+collections:
+  essays:
+    output: true
+    permalink: /:collection/:name
+
+defaults:
+  -
+    scope:
+      type: "essays"
+    values:
+      layout: "default"
+      author: "Lax"
