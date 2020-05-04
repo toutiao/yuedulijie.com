@@ -1,0 +1,17 @@
+---
+layout: default
+---
+
+<article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <main class="container">
+    <h1 class="post-title" itemprop="name headline">{{ page.title | escape }}</h1>
+{% if null != page.description %}
+    <p class="post-description">{{ page.description }}</p>
+{% endif %}
+
+    <div class="post-content">
+      {{ content }}
+    </div>
+  </main>
+
+</article>
