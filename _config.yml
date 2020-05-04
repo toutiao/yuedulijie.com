@@ -14,7 +14,33 @@ collections:
 defaults:
   -
     scope:
+      path: ""
+      type: posts
+    values:
+      layout: "post"
+  -
+    scope:
+      path: ""
+      type: pages
+    values:
+      layout: "page"
+  -
+    scope:
       type: "essays"
     values:
       layout: "default"
       author: "Lax"
+
+sass:
+  sass_dir: _sass/
+  style: compressed
+
+compress_html:
+  clippings: []
+  comments: []
+  endings: []
+  ignore:
+    envs: [development]
+  blanklines: false
+  profile: false
+  startings: []
