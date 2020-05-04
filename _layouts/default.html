@@ -17,22 +17,7 @@ layout: compress
     <link rel="stylesheet" media="all" href="{{ "/assets/main.css?v=" | append: site.github.build_revision | relative_url }}" data-turbolinks-track="reload" />
   </head>
   <body>
-    <header class="header sticky-top">
-      <div class="navbar">
-        <a class="navbar-brand" href="{{ site.baseurl | absolute_url }}">{{ site.title }}</a>
-        <nav class="navbar-nav">
-          <a class="nav-item nav-link active" href="{{ site.baseurl | absolute_url }}">Home</a>
-          {%- assign nav_items = (site.pages | where_exp: 'item', 'item.nav == true') -%}
-          {%- for item in nav_items -%}
-          <a class="nav-item nav-link" href="{{ item.url | relative_url }}">{% if item.nav_title %}{{ item.nav_title }}{% else %}{{ item.title }}{% endif %}</a>
-          {%- endfor -%}
-        </nav>
-
-        <nav class="navbar-nav">
-          <a class="nav-item nav-link" href='{{ "/archives.html" | relative_url }}'>archives</a>
-        </nav>
-      </div>
-    </header>
+    {% include header.html %}
     {{ content }}
     <script async src="{{ "/assets/main.js?v=" | append: site.github.build_revision | relative_url }}" data-turbolinks-track="reload"></script>
     {%- if jekyll.environment == 'production' and site.google_analytics -%}

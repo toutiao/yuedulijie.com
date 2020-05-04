@@ -1,0 +1,16 @@
+<header class="header sticky-top">
+  <div class="navbar">
+    <a class="navbar-brand" href="{{ site.baseurl | absolute_url }}">{{ site.title }}</a>
+    <nav class="navbar-nav">
+      <a class="nav-item nav-link active" href="{{ site.baseurl | absolute_url }}">Home</a>
+      {%- assign nav_items = (site.pages | where_exp: 'item', 'item.nav == true') -%}
+      {%- for item in nav_items -%}
+      <a class="nav-item nav-link" href="{{ item.url | relative_url }}">{{ item.title }}</a>
+      {%- endfor -%}
+    </nav>
+
+    <nav class="navbar-nav">
+      <a class="nav-item nav-link" href='{{ "/archives.html" | relative_url }}'>archives</a>
+    </nav>
+  </div>
+</header>
