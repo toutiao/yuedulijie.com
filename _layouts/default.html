@@ -1,8 +1,18 @@
-<html>
+---
+layout: compress
+---
+
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: site.lang | default: "en" }}">
   <head>
     {{ seo }}
   </head>
   <body>
     {{ content }}
   </body>
-</html>
+</html>{% if site.github %}<!--
+environment: {{ site.github.environment }}
+build_revision: {{ site.github.build_revision }}
+url: {{ site.github.url }}
+{% for item in site.github.versions %}{{ item[0] }} : {{ item[1] }}
+{% endfor %}-->{% endif %}
