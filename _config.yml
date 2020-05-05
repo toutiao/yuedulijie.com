@@ -28,7 +28,7 @@ defaults:
     scope:
       type: "essays"
     values:
-      layout: "default"
+      layout: "post"
       author: "浅井兵太郎"
 
 sass:
