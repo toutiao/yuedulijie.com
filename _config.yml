@@ -29,7 +29,7 @@ defaults:
       type: "essays"
     values:
       layout: "default"
-      author: "Lax"
+      author: "浅井兵太郎"
 
 sass:
   sass_dir: _sass/
