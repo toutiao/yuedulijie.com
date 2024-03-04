@@ -10,6 +10,12 @@ collections:
   essays:
     output: true
     permalink: /:collection/:name
+  movies:
+    output: true
+    permalink: /:collection/:year/:name
+  books:
+    output: true
+    permalink: /:collection/:year/:name
 
 defaults:
   -
@@ -26,14 +32,18 @@ defaults:
       layout: "page"
   -
     scope:
-      type: "movies"
+      path: "_movies"
+      type: posts
     values:
       layout: "post"
+      categories: [movies]
   -
     scope:
-      type: "books"
+      path: "_books"
+      type: posts
     values:
       layout: "post"
+      categories: [books]
   -
     scope:
       type: "essays"

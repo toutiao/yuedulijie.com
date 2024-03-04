@@ -1,6 +1,5 @@
 ---
 title: 小早川家の秋
-categories: [movies]
 ---
 
 1961 年电影，小津安二郎作品。
