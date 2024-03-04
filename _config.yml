@@ -33,17 +33,17 @@ defaults:
   -
     scope:
       path: "_movies"
-      type: posts
+      type: movies
     values:
-      layout: "post"
       categories: [movies]
+      layout: "post"
   -
     scope:
       path: "_books"
-      type: posts
+      type: books
     values:
-      layout: "post"
       categories: [books]
+      layout: "post"
   -
     scope:
       type: "essays"
