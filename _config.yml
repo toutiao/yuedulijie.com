@@ -26,6 +26,16 @@ defaults:
       layout: "page"
   -
     scope:
+      type: "movies"
+    values:
+      layout: "post"
+  -
+    scope:
+      type: "books"
+    values:
+      layout: "post"
+  -
+    scope:
       type: "essays"
     values:
       layout: "post"
