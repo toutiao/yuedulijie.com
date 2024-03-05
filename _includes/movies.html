@@ -1,0 +1,20 @@
+{% for post in include.posts reversed %}
+  {%- capture year -%}{{ post.date | date: "%Y" }}{%- endcapture -%}
+  {%- capture month -%}{{ post.date | date: "%B" }}{%- endcapture -%}
+  {%- capture day -%}{{ post.date | date: "%F" }}{%- endcapture -%}
+
+  {%- if year != current_year -%}
+<div class="year" id='year-{{ year }}'><h3>{{ year }}</h3></div>
+    {%- assign current_year = year -%}
+    {%- assign current_month = null -%}
+  {%- endif -%}
+
+  {%- if month != current_month -%}
+<div class="month" id='month-{{ month }}'><h4>{{ month }}</h4></div>
+    {%- assign current_month = month -%}
+  {%- endif -%}
+<div class="day-title">
+  <div class="day"><p title="{{ day }}">{{ post.date | date: "%e" }}</p></div>
+  <div class="post-title"><p><a href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a></p></div>
+</div>
+{%- endfor -%}
