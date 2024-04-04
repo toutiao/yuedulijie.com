@@ -1,7 +1,7 @@
-title: 阅读理解
+title: You Need Sex
 
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://yuedulijie.com"
+url: "https://youneedsex.com"
 
 timezone: Asia/Shanghai
 encoding: utf-8
@@ -49,7 +49,7 @@ defaults:
       type: "essays"
     values:
       layout: "post"
-      author: "浅井兵太郎"
+      author: "深井兵太郎"
 
 plugins:
   - jekyll-seo-tag
