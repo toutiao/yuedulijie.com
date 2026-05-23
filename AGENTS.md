@@ -7,6 +7,7 @@
 - Ruby gem: `github-pages`
 - **Local dev**: Docker (ruby:3.2-slim), no local Ruby needed
 - **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`), auto-deploys on push to master
+- **Sub-site**: [UP-6 英语学习导航](https://up-6.yuedulijie.com) — `github.com/Lax/up-6.yuedulijie.com`
 
 ## Project Layout
 ```
