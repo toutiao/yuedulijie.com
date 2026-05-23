@@ -11,16 +11,20 @@
 ## Project Layout
 ```
 _config.yml      # Site config (title, collections, plugins)
+CNAME            # Custom domain: yuedulijie.com
 _includes/       # Reusable HTML fragments
 _layouts/        # Page/post layouts (Liquid)
 _movies/         # Movie review collection (14 posts)
 _books/          # Book review collection (empty)
+_essays/         # Essay collection (empty)
+_sass/           # SCSS partials
 assets/          # CSS (SCSS), JS, favicon
 index.html       # Home page
 archives.html    # Archive page
 books.html       # Books listing
 movies.html      # Movies listing
 Gemfile          # Ruby dependencies
+Gemfile.lock     # Gem dependency lock (committed for reproducible builds)
 .github/         # CI/CD workflows
 ```
 

@@ -20,7 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/configure-pages@v5
+      - id: config
+        uses: actions/configure-pages@v5
+        with:
+          static_site_generator: jekyll
 
       - uses: ruby/setup-ruby@v1
         with:
