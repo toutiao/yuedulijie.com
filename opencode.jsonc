@@ -1,0 +1,123 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "build",
+  "agent": {
+    "project-manager": {
+      "description": "Oversees project strategy, backlogs, and agent coordination",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "git *": "allow",
+          "ls *": "allow"
+        },
+        "task": "allow",
+        "skill": {
+          "*": "allow"
+        }
+      }
+    },
+    "content-manager": {
+      "description": "Manages movies, books, essays collections and front matter",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "ls *": "allow"
+        }
+      }
+    },
+    "jekyll-builder": {
+      "description": "Builds Jekyll site, runs validation, fixes build errors",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "bundle *": "allow",
+          "jekyll *": "allow",
+          "ls *": "allow"
+        }
+      }
+    },
+    "self-evolve": {
+      "description": "Reviews and improves agent configurations, skills, and workflows",
+      "mode": "subagent",
+      "temperature": 0.4,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "ls *": "allow",
+          "cat *": "allow"
+        },
+        "skill": {
+          "*": "allow"
+        }
+      }
+    },
+    "git-publisher": {
+      "description": "Auto-test, stage, commit, and push changes with proper messages",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "git *": "allow",
+          "bundle *": "allow",
+          "ls *": "allow"
+        },
+        "skill": "allow"
+      }
+    }
+  },
+  "command": {
+    "test": {
+      "template": "Run the Jekyll build to verify the site compiles without errors:\n1. Run `bundle exec jekyll build`\n2. Check for any warnings or errors\n3. Fix any issues found\n4. Report the build status",
+      "description": "Build & validate Jekyll site",
+      "agent": "jekyll-builder"
+    },
+    "deploy": {
+      "template": "Full deploy workflow:\n1. Build the Jekyll site and verify no errors\n2. Stage all changes\n3. Create a meaningful commit message summarizing what changed\n4. Push to origin master\n5. Confirm the deploy is done",
+      "description": "Build, commit & push to GitHub Pages",
+      "agent": "git-publisher"
+    },
+    "evolve": {
+      "template": "Review all agent configurations and skills in .opencode/ and opencode.jsonc.\nIdentify:\n- Gaps or missing capabilities\n- Outdated instructions\n- Opportunities for improvement\n- Redundancies\nSuggest and apply concrete improvements.",
+      "description": "Self-review and improve agent configs",
+      "agent": "self-evolve"
+    },
+    "plan": {
+      "template": "Analyze the project structure, recent changes, and TODO list. Create a plan for what to work on next. Consider:\n- Content gaps (missing movies, books, essays)\n- Site improvements\n- Configuration improvements\n- Technical debt",
+      "description": "Plan next steps for the project",
+      "agent": "project-manager"
+    },
+    "content": {
+      "template": "List all content in _movies/, _books/ (if exists), and any essay collections.\nCheck for:\n- Missing front matter fields\n- Inconsistent naming conventions\n- Opportunities to add new content\n- Broken links or references",
+      "description": "Audit and manage site content",
+      "agent": "content-manager"
+    }
+  },
+  "instructions": ["AGENTS.md"]
+}
