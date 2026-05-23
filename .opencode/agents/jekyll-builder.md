@@ -5,8 +5,8 @@ temperature: 0.1
 permission:
   bash:
     "*": ask
-    "bundle *": allow
-    "jekyll *": allow
+    "docker compose *": allow
+    "make *": allow
     "ls *": allow
 ---
 
@@ -33,9 +33,11 @@ make build
 - Ensure the `_site/` output is clean
 - Report build status clearly
 
-## Notes
-- Site uses `github-pages` gem inside Docker (ruby:3.2-slim)
-- Plugins: jekyll-seo-tag
-- Sass in _sass/ directory, compressed style
-- HTML compression enabled in production
+## Site Details
+- **Gem**: `github-pages` inside Docker (ruby:3.2-slim)
+- **Plugins**: `jekyll-seo-tag` only
+- **CSS pipeline**: SCSS in `_sass/`, compiled to `assets/css/main.scss`
+- **HTML compression**: enabled in production via `compress_html` config
+- **No drafts**: no `_drafts/` directory exists
+- **Environment**: `JEKYLL_ENV=production` for build, `development` for serve
 - No local Ruby/Jekyll install needed — everything runs in container

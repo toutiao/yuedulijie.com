@@ -105,7 +105,7 @@
       "agent": "git-publisher"
     },
     "evolve": {
-      "template": "Review all agent configurations and skills in .opencode/ and opencode.jsonc.\nIdentify:\n- Gaps or missing capabilities\n- Outdated instructions\n- Opportunities for improvement\n- Redundancies\nSuggest and apply concrete improvements.",
+      "template": "Review all agent configs (.opencode/agents/*.md, .opencode/skills/*/SKILL.md), opencode.jsonc, AGENTS.md, and infrastructure files (Makefile, Dockerfile, docker-compose.yml, .github/workflows/deploy.yml).\nIdentify:\n- Gaps or missing capabilities\n- Outdated instructions\n- Permission inconsistencies\n- Opportunities for improvement\n- Redundancies\nSuggest and apply concrete improvements.",
       "description": "Self-review and improve agent configs",
       "agent": "self-evolve"
     },
@@ -115,7 +115,7 @@
       "agent": "project-manager"
     },
     "content": {
-      "template": "List all content in _movies/, _books/ (if exists), and any essay collections.\nCheck for:\n- Missing front matter fields\n- Inconsistent naming conventions\n- Opportunities to add new content\n- Broken links or references",
+      "template": "List all content in _movies/ (14 posts), _books/ (empty, only .gitkeep), and _essays/ (empty, only .gitkeep).\nCheck for:\n- Missing front matter fields (some movie posts only have `title`)\n- Inconsistent naming conventions (dot-before-year vs plain date)\n- Opportunities to add new content\n- Whether _books/ or _essays/ have actual posts yet",
       "description": "Audit and manage site content",
       "agent": "content-manager"
     }

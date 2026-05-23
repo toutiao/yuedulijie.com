@@ -7,9 +7,10 @@ metadata:
 ---
 
 ## What I Do
-- Read all files under `.opencode/` and `opencode.jsonc`
+- Read all files under `.opencode/`, `opencode.jsonc`, `AGENTS.md`, and infrastructure files (`Makefile`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy.yml`)
 - Compare agent descriptions against actual project needs
 - Identify missing permissions, outdated prompts, redundant configs
+- Check for inconsistencies between `.md` front matter and `opencode.jsonc`
 - Propose and apply concrete fixes
 
 ## When to Use

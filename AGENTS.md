@@ -42,15 +42,15 @@ After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
 ```
 
 ## Agents
-| Agent           | Role                                          |
-|-----------------|-----------------------------------------------|
-| build (default) | Standard development agent                    |
-| plan            | Analysis & planning (no edits)                |
-| project-manager | Strategy, backlog, agent coordination         |
-| content-manager | Content audit and management                  |
-| jekyll-builder  | Jekyll build, validation, fix errors          |
-| self-evolve     | Review and improve agent configurations       |
-| git-publisher   | Auto-test → stage → commit → push             |
+| Agent           | Type     | Role                                          |
+|-----------------|----------|-----------------------------------------------|
+| build (default) | built-in | Standard development agent                    |
+| plan            | built-in | Analysis & planning (no edits)                |
+| project-manager | custom   | Strategy, backlog, agent coordination         |
+| content-manager | custom   | Content audit and management                  |
+| jekyll-builder  | custom   | Jekyll build, validation, fix errors          |
+| self-evolve     | custom   | Review and improve agent configurations       |
+| git-publisher   | custom   | Auto-test → stage → commit → push             |
 
 ## Commands
 | Command   | Description                        | Agent          |

@@ -3,10 +3,15 @@ description: Oversees project strategy, backlogs, and agent coordination
 mode: subagent
 temperature: 0.2
 permission:
+  read: allow
+  glob: allow
+  grep: allow
+  edit: allow
   bash:
     "*": ask
     "git *": allow
     "ls *": allow
+  task: allow
   skill:
     "*": allow
 ---
