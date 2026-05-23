@@ -9,6 +9,7 @@ serve:
 test: build
 
 deploy:
+	@[ -n "$(msg)" ] || (echo "Usage: make deploy msg='commit message'" && exit 1)
 	docker compose run --rm build && \
 	git add -A && \
 	git commit -m "$(msg)" && \
