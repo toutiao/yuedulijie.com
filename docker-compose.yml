@@ -1,0 +1,31 @@
+services:
+  jekyll:
+    build:
+      context: .
+      target: dev
+    image: yuedulijie-jekyll:latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - .:/site
+      - bundle_data:/usr/local/bundle
+    environment:
+      - JEKYLL_ENV=development
+    stdin_open: true
+    tty: true
+
+  build:
+    build:
+      context: .
+      target: build
+    image: yuedulijie-jekyll:latest
+    profiles:
+      - cli
+    volumes:
+      - .:/site
+      - bundle_data:/usr/local/bundle
+    environment:
+      - JEKYLL_ENV=production
+
+volumes:
+  bundle_data:

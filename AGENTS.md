@@ -5,6 +5,7 @@
 - Domain: https://yuedulijie.com
 - Branch: `master` (deployed directly to Pages)
 - Ruby gem: `github-pages`
+- **Local dev**: Docker (ruby:3.2-slim), no local Ruby needed
 
 ## Project Layout
 ```

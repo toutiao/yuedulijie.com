@@ -48,8 +48,8 @@
         "edit": "allow",
         "bash": {
           "*": "ask",
-          "bundle *": "allow",
-          "jekyll *": "allow",
+          "docker compose *": "allow",
+          "make *": "allow",
           "ls *": "allow"
         }
       }
@@ -85,7 +85,8 @@
         "bash": {
           "*": "ask",
           "git *": "allow",
-          "bundle *": "allow",
+          "docker compose *": "allow",
+          "make *": "allow",
           "ls *": "allow"
         },
         "skill": "allow"
@@ -94,7 +95,7 @@
   },
   "command": {
     "test": {
-      "template": "Run the Jekyll build to verify the site compiles without errors:\n1. Run `bundle exec jekyll build`\n2. Check for any warnings or errors\n3. Fix any issues found\n4. Report the build status",
+      "template": "Run the Jekyll build in Docker to verify the site compiles without errors:\n1. Run `docker compose run --rm build` or `make build`\n2. Check for any warnings or errors in the output\n3. Fix any issues found\n4. Report the build status (no local Ruby needed)",
       "description": "Build & validate Jekyll site",
       "agent": "jekyll-builder"
     },

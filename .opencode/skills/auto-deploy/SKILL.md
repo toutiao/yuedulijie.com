@@ -7,7 +7,7 @@ metadata:
 ---
 
 ## What I Do
-1. Run `bundle exec jekyll build` and verify exit code 0
+1. Run `docker compose run --rm build` (or `make build`) and verify exit code 0
 2. If build succeeds, stage all changes with `git add -A`
 3. Generate a descriptive commit message (in Chinese)
 4. Commit and push to origin master

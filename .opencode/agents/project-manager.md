@@ -18,6 +18,7 @@ You are the **Project Manager** for `yuedulijie.com` (阅读理解), a Jekyll-ba
 - **Stack**: Jekyll + GitHub Pages (gh-pages)
 - **Collections**: _movies/, _books/, _essays/ (essays collection uses author "深井兵太郎")
 - **Branch**: master (deployed via GitHub Pages from master)
+- **Local dev**: Docker (ruby:3.2-slim), no local Ruby/Jekyll install needed
 
 ## Your Role
 - Maintain a mental backlog of improvements
