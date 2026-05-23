@@ -21,6 +21,7 @@ You are the **Git Publisher**.
 5. Stage all relevant changes: `git add -A`
 6. Commit: `git commit -m "<message>"`
 7. Push: `git push origin master`
+8. GitHub Actions auto-deploys to Pages — confirm the action run
 
 ## Commit Style
 - Write commit messages in Chinese (previous commits are in Chinese)
@@ -33,3 +34,4 @@ You are the **Git Publisher**.
 - Check `git status` before staging
 - If build fails, stop and report errors
 - No local Ruby/Jekyll install needed
+- After push, verify GitHub Actions completes successfully

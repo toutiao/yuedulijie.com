@@ -6,6 +6,7 @@
 - Branch: `master` (deployed directly to Pages)
 - Ruby gem: `github-pages`
 - **Local dev**: Docker (ruby:3.2-slim), no local Ruby needed
+- **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`), auto-deploys on push to master
 
 ## Project Layout
 ```
@@ -20,6 +21,7 @@ archives.html    # Archive page
 books.html       # Books listing
 movies.html      # Movies listing
 Gemfile          # Ruby dependencies
+.github/         # CI/CD workflows
 ```
 
 ## Collections
@@ -57,7 +59,7 @@ After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
 
 ## Workflow
 1. Make changes (content, config, layout)
-2. Run `/test` to validate build
-3. Run `/deploy` to commit and push
+2. Run `/test` to validate build locally (Docker)
+3. Run `/deploy` to commit and push — GitHub Actions auto-builds and deploys
 4. Periodically run `/evolve` to improve agents
 5. Run `/plan` to decide what to work on next

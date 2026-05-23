@@ -11,7 +11,8 @@ metadata:
 2. If build succeeds, stage all changes with `git add -A`
 3. Generate a descriptive commit message (in Chinese)
 4. Commit and push to origin master
-5. If build fails, report errors immediately
+5. GitHub Actions takes over — auto-builds and deploys to Pages
+6. If local build fails, report errors immediately
 
 ## When to Use
 - When you've made changes and want to deploy
