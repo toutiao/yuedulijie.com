@@ -252,3 +252,76 @@ article main {
     }
   }
 }
+
+/* ---- 首页 ---- */
+main.container.home {
+  h1 {
+    font-size: 2.5em;
+    margin: 1.5em 0 1em;
+    text-align: center;
+    font-weight: 200;
+  }
+
+  .section-overview {
+    display: flex;
+    gap: 1.5em;
+    margin: 2em 0;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+
+    .card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 1.5em 1em;
+      text-align: center;
+
+      h3 { margin: 0 0 0.5em; font-size: 1.1em; font-weight: 400; }
+      .count { font-size: 2.5em; color: #ccc; font-weight: 200; }
+      .latest { font-size: 0.85em; margin: 0.8em 0; color: #999; }
+      .card-link {
+        margin-top: auto;
+        font-size: 0.85em;
+        border-bottom: 1px solid #ddd;
+        &:hover { border-color: #666; }
+      }
+    }
+  }
+
+  .section-recent {
+    margin: 3em 0;
+
+    h2 {
+      font-size: 1.5em;
+      font-weight: 300;
+      text-align: center;
+      margin-bottom: 1.5em;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 0.8em;
+      padding: 0.4em 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 0.9em;
+
+      .recent-date { color: #bbb; white-space: nowrap; min-width: 5em; }
+      .tag {
+        font-size: 0.75em;
+        padding: 1px 8px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+      .tag-movies { background: #f0f0f0; color: #888; }
+      .tag-books  { background: #eef5ee; color: #7a9a7a; }
+      .tag-articles { background: #f5eef5; color: #9a7a9a; }
+      .tag-essays { background: #f5f0e8; color: #9a8a7a; }
+    }
+  }
+}

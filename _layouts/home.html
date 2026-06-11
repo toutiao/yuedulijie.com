@@ -3,6 +3,71 @@ layout: default
 ---
 {{ content }}
 
-<main class="container">
-  <h2>{{ page.title | escape }}</h2>
+<main class="container home">
+  <h1>{{ site.title }}</h1>
+
+  <section class="section-overview">
+    <div class="card">
+      <h3>影评</h3>
+      <span class="count">{{ site.movies.size }}</span>
+      {% assign latest = site.movies | sort: "date" | last %}
+      {% if latest %}
+      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      {% endif %}
+      <a class="card-link" href="/movies.html">查看全部 →</a>
+    </div>
+
+    <div class="card">
+      <h3>读书笔记</h3>
+      <span class="count">{{ site.books.size }}</span>
+      {% assign latest = site.books | sort: "date" | last %}
+      {% if latest %}
+      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      {% endif %}
+      <a class="card-link" href="/books.html">查看全部 →</a>
+    </div>
+
+    <div class="card">
+      <h3>文章心得</h3>
+      <span class="count">{{ site.articles.size }}</span>
+      {% assign latest = site.articles | sort: "date" | last %}
+      {% if latest %}
+      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      {% endif %}
+      <a class="card-link" href="/articles.html">查看全部 →</a>
+    </div>
+
+    <div class="card">
+      <h3>随笔</h3>
+      <span class="count">{{ site.essays.size }}</span>
+      {% assign latest = site.essays | sort: "date" | last %}
+      {% if latest %}
+      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section-recent">
+    <h2>最近更新</h2>
+
+    {% assign all_items = "" | split: "" %}
+    {% for item in site.movies %}{% assign all_items = all_items | push: item %}{% endfor %}
+    {% for item in site.books %}{% assign all_items = all_items | push: item %}{% endfor %}
+    {% for item in site.articles %}{% assign all_items = all_items | push: item %}{% endfor %}
+    {% for item in site.essays %}{% assign all_items = all_items | push: item %}{% endfor %}
+    {% assign sorted = all_items | sort: "date" | reverse %}
+
+    {% for post in sorted limit: 20 %}
+    <div class="recent-item">
+      <span class="recent-date">{{ post.date | date: "%Y-%m-%d" }}</span>
+      <span class="tag tag-{{ post.collection }}">
+        {% if post.collection == "movies" %}影评
+        {% elsif post.collection == "books" %}读书笔记
+        {% elsif post.collection == "articles" %}文章心得
+        {% elsif post.collection == "essays" %}随笔{% endif %}
+      </span>
+      <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+    </div>
+    {% endfor %}
+  </section>
 </main>
