@@ -8,33 +8,30 @@ layout: default
 
   <section class="section-overview">
     <div class="card">
-      <h3>影评</h3>
+      <h3>电影</h3>
       <span class="count">{{ site.movies.size }}</span>
       {% assign latest = site.movies | sort: "date" | last %}
       {% if latest %}
-      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
       {% endif %}
-      <a class="card-link" href="/movies.html">查看全部 →</a>
     </div>
 
     <div class="card">
-      <h3>读书笔记</h3>
+      <h3>书籍</h3>
       <span class="count">{{ site.books.size }}</span>
       {% assign latest = site.books | sort: "date" | last %}
       {% if latest %}
-      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
       {% endif %}
-      <a class="card-link" href="/books.html">查看全部 →</a>
     </div>
 
     <div class="card">
-      <h3>文章心得</h3>
+      <h3>文章</h3>
       <span class="count">{{ site.articles.size }}</span>
       {% assign latest = site.articles | sort: "date" | last %}
       {% if latest %}
-      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
       {% endif %}
-      <a class="card-link" href="/articles.html">查看全部 →</a>
     </div>
 
     <div class="card">
@@ -42,7 +39,7 @@ layout: default
       <span class="count">{{ site.essays.size }}</span>
       {% assign latest = site.essays | sort: "date" | last %}
       {% if latest %}
-      <p class="latest">最新：<a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
+      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
       {% endif %}
     </div>
   </section>
@@ -61,9 +58,9 @@ layout: default
     <div class="recent-item">
       <span class="recent-date">{{ post.date | date: "%Y-%m-%d" }}</span>
       <span class="tag tag-{{ post.collection }}">
-        {% if post.collection == "movies" %}影评
-        {% elsif post.collection == "books" %}读书笔记
-        {% elsif post.collection == "articles" %}文章心得
+        {% if post.collection == "movies" %}电影
+        {% elsif post.collection == "books" %}书籍
+        {% elsif post.collection == "articles" %}文章
         {% elsif post.collection == "essays" %}随笔{% endif %}
       </span>
       <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
