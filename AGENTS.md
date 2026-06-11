@@ -67,6 +67,14 @@ After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
 | /content  | Audit and manage content           | content-manager|
 | /hn       | Create HN discussion summary article| hn-summarizer |
 
+## External API Restrictions
+
+Third-party APIs permanently banned:
+- HN Firebase API (`firebaseio.com/v0/`)
+- HN Algolia Search API (`hn.algolia.com`)
+
+All HN data acquisition: `webfetch` ONLY. No agent, skill, command, or script may use these APIs for any purpose. Hard constraint.
+
 ## Workflow
 1. Make changes (content, config, layout)
 2. Run `/test` to validate build locally (Docker)

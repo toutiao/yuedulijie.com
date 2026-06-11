@@ -106,14 +106,15 @@ categories: [articles]
 
 ### Quote verification
 For each blockquoted quote in the article:
-1. HN Firebase API fetch comment by item id
-2. Compare raw original vs article quote:
+1. `webfetch` HN comment page (format: html) — `https://news.ycombinator.com/item?id={comment_id}`
+2. Locate comment in page: `<span class="commtext c00">`
+3. Compare rendered text vs article quote:
    - Must match verbatim (no paraphrase, no added detail)
    - Attribution (username) must match
    - Ellipsis (...) must not change original meaning
    - CN translation must faithfully reflect EN intent
-3. Fix any flagged discrepancy
-4. Report per quote: ✓ verified / ⚠ fixed / ✗ flagged
+4. Fix any flagged discrepancy
+5. Report per quote: ✓ verified / ⚠ fixed / ✗ flagged
 
 ### Sensitivity scan
 After quote verification, scan article body for sensitive terms:
