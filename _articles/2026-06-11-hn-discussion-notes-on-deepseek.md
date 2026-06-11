@@ -11,15 +11,15 @@ categories: [articles]
 
 该帖原题为"Notes on DeepSeek"，是一位访客参观 DeepSeek 杭州总部的见闻记录，后被作者删除（swyx 在评论区重新贴出了全文）。
 
-DeepSeek 于 2023 年由梁文锋创立，最初在其对冲基金 High-Flyer 内部运作，2025 年 1 月发布 R1 模型。总部位于杭州一栋无标识的 12 层楼中，门口没有任何 DeepSeek 品牌标识。团队解释："这栋楼里有很多公司，我们并不特殊。"
+DeepSeek 于 2023 年由梁文锋创立，最初在其对冲基金 High-Flyer 内部运作，2025 年 1 月发布 `R1` 模型。总部位于杭州一栋无标识的 12 层楼中，门口没有任何 DeepSeek 品牌标识。团队解释："这栋楼里有很多公司，我们并不特殊。"
 
 公司仅 300 名员工（比 Anthropic 小一个数量级），无意短期内扩张。基础架构主管约 30 岁，被认为是国内顶尖的 AI 基建和能源专家，整个团队非常年轻、充满活力。
 
-在国内市场面临阿里（Qwen）、字节跳动、Moonshot（Kimi）的激烈竞争。年轻人用 VPN 访问 Claude，但 Anthropic 有封锁措施。DeepSeek 在业内口碑"很酷"，类似 Anthropic 在美国的形象。主要 AI 实验室集中在北京（清华/北大附近），杭州是例外（DeepSeek 和阿里）。
+在国内市场面临阿里（`Qwen`）、字节跳动、Moonshot（`Kimi`）的激烈竞争。年轻人用 VPN 访问 Claude，但 Anthropic 有封锁措施。DeepSeek 在业内口碑"很酷"，类似 Anthropic 在美国的形象。主要 AI 实验室集中在北京（清华/北大附近），杭州是例外（DeepSeek 和阿里）。
 
 DeepSeek 团队阅读西方 AI 作者，听 Dwarkesh 播客、读 Gwern。他们从未与 Anthropic 员工交流过，完全不关心 AGI 接管场景，主要担忧是青年失业——中国年轻人失业率已经很高。不做 red teaming。在中国，AI 模型不受直接监管，政府限制的是模型在软件和服务中的使用方式。
 
-整体上，中国把 AI 看作另一种技术，而非奇点时刻。国家注意力仍在基础需求和基建上。团队被问到"高光时刻和退出计划"时，回答是 R1——他们为已取得的成就感到骄傲，而不是描绘未来愿景。满足于比美国公司落后约 6 个月，保持低姿态和小团队。
+整体上，中国把 AI 看作另一种技术，而非奇点时刻。国家注意力仍在基础需求和基建上。团队被问到"高光时刻和退出计划"时，回答是 `R1`——他们为已取得的成就感到骄傲，而不是描绘未来愿景。满足于比美国公司落后约 6 个月，保持低姿态和小团队。
 
 ---
 
@@ -63,7 +63,7 @@ DeepSeek 大幅拉低了 AI 使用成本，多位用户表示已从 OpenAI/Claud
 > "I truly don't see how this is sustainable for the US AI giants in the long term to maintain like 25x+ markup for 1.25x performance benefit." — toraway
 > （我真的看不到美国 AI 巨头长期如何维持 25 倍以上的溢价，而性能优势只有 1.25 倍。）
 
-几位用户提到，美国公司最近的"超级模型"叙事（如 Anthropic 的 Mythos）本质是利用 FOMO 来混淆决策者：
+几位用户提到，美国公司最近的"超级模型"叙事（如 Anthropic 的 `Mythos`）本质是利用 FOMO 来混淆决策者：
 
 > "IMO it does help explain the recent emphasis on secret, scary 'super models' to muddy the waters for decision makers with hype and FOMO at a time when companies are beginning to seriously scrutinize their token spending." — toraway
 > （这有助于解释最近强调秘密、可怕的"超级模型"的用意——在公司开始认真审视 token 花费的时候，用炒作和 FOMO 搞浑水。）
@@ -99,13 +99,13 @@ DeepSeek 大幅拉低了 AI 使用成本，多位用户表示已从 OpenAI/Claud
 
 一位用户做了实测：
 
-> "I was surprised to find self-hosted DeepSeek V4 Flash answers accurately about almost every hot-button topic I could think of *except* Tiananmen Square, which it refused to answer. Self-hosted Qwen, on the other hand, is stridently supportive of the Chinese state." — SwellJoe（附博客链接）
-> （令我惊讶的是，自部署的 DeepSeek V4 Flash 几乎能准确回答每一个敏感话题，唯一拒绝的是六四。而自部署的 Qwen 则高调支持中国政府立场。）
+> "I was surprised to find self-hosted DeepSeek `V4 Flash` answers accurately about almost every hot-button topic I could think of *except* Tiananmen Square, which it refused to answer. Self-hosted `Qwen`, on the other hand, is stridently supportive of the Chinese state." — SwellJoe（附博客链接）
+> （令我惊讶的是，自部署的 DeepSeek V4 Flash 几乎能准确回答每一个敏感话题，唯一拒绝的是六四。而自部署的 `Qwen` 则高调支持中国政府立场。）
 
 另一位用户补充了关键区别：
 
-> "Note that Qwen from Alibaba chooses to align the model with the PCC. It's not the same as DeepSeek who ensure it at the 'service' level." — _ache_
-> （阿里的 Qwen 选择在模型层与中共对齐。而 DeepSeek 的审查在"服务"层，不是一回事。）
+> "Note that `Qwen` from Alibaba chooses to align the model with the PCC. It's not the same as DeepSeek who ensure it at the 'service' level." — _ache_
+> （阿里的 `Qwen` 选择在模型层与中共对齐。而 DeepSeek 的审查在"服务"层，不是一回事。）
 
 评论区对此有进一步讨论——自部署模型和在线服务的差异：
 
@@ -149,7 +149,7 @@ DeepSeek 大幅拉低了 AI 使用成本，多位用户表示已从 OpenAI/Claud
 
 作为"中国才是威胁"叙事的反例，有用户指出美国用 AI 定位并打击学校：
 
-> "US used AI (Claude on Maven) to determine a girl's elementary school as a target in war and then triple tapped it and you're still more worried about hypothetical misuses of China?" — culi
+> "US used AI (Claude on `Maven`) to determine a girl's elementary school as a target in war and then triple tapped it and you're still more worried about hypothetical misuses of China?" — culi
 > （美国用 AI——Claude on Maven——确定一所女子小学为打击目标，然后进行了三次打击。而你还更担心假设性的中国滥用？）
 
 有用户反驳称，该学校靠近伊朗军事基地，是人而非 AI 的责任：
