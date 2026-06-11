@@ -226,6 +226,15 @@ article main {
     font-size: 16px;
     line-height: 1.7;
 
+    .disclaimer {
+      font-size: 0.8em;
+      color: #999;
+      border-left: 3px solid #ddd;
+      background: #fafafa;
+      padding: 0.6em 1em;
+      margin: 2em 0;
+    }
+
     blockquote {
       margin: 1.5em 0;
       padding: 0.5em 1.2em;
