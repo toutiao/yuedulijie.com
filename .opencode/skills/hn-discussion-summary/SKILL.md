@@ -69,6 +69,8 @@ After post selected or URL given:
 
 ## Phase 2 — Write
 
+Before writing, load chinese-writing-style skill.
+
 ### Front matter (date 自动填充, 禁止手动输入)
 ```
 ---
