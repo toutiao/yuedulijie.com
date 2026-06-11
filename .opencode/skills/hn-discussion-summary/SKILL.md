@@ -8,7 +8,7 @@ metadata:
 
 ## Phase 0 — Scan (no URL given)
 
-1. `webfetch` https://news.ycombinator.com/best (text format)
+1. `webfetch` https://news.ycombinator.com/best?h=48 (text format)
 2. Parse stories: title + score + item URL
 3. Filter:
    - score >= 80
@@ -25,11 +25,44 @@ metadata:
    Input: number / URL / "n" to skip
    ```
 
+## Phase 0.5 — Cluster Detection (auto)
+
+After post selected or URL given:
+1. `webfetch` HN source page (format: html)
+   - Topic from `/best` → `https://news.ycombinator.com/best?h=48`
+   - Topic from `/news` → start at `/news`, follow "morelink" until score < 80 or age > 48h (parse "X hours ago" / "X days ago")
+2. Parse `<tr class="athing">`: extract `id` + title + score
+3. Derive keyword from selected post title:
+   - Drop leading common words (Claude, new, update, Introducing)
+   - Take first remaining meaningful token
+4. Filter: title contains keyword, score >= 80, not self
+5. If >= 2 matches → show:
+
+   ```
+   Detected cluster — {N} related posts:
+     [1] {title} ({score} pts) — MAIN
+     [2] {title} ({score} pts)
+     ...
+   Include all? [y] / select numbers [1,3,5] / [n] skip
+   ```
+
+   Otherwise → single post mode.
+
+6. User input sets cluster scope for Phase 1.
+
 ## Phase 1 — Fetch + Analyze
 
-1. `webfetch` target HN page (markdown format)
-2. If topic has linked article, `webfetch` target page too
+### Single post mode
+1. `webfetch` HN page (markdown format)
+2. If linked article exists, `webfetch` target page
 3. Extract: topic clusters / quotes+usernames / unique opinions
+4. For each quote used, record HN comment item id
+
+### Cluster mode
+1. Main post: top 20 top-level comments
+2. Each related post: top 8 top-level comments
+3. Track `thread_id` per quote (e.g. "[thread 2]")
+4. Merge all comments, group by theme (not by thread)
 
 ## Phase 2 — Write
 
@@ -45,11 +78,13 @@ categories: [articles]
 
 ### Structure (fixed order)
 1. **原文概要** — context intro, 2-5 paragraphs
+   - Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)"
 2. **讨论焦点** — key themes in `###` sections
-   - Per section: context paragraph -> blockquote (EN + CN translation)
+   - Cluster mode: blockquotes annotate source `[thread #N]`
 3. **典型观点一览** — table, columns: 立场 / 用户 / 一句话
 4. **总体情绪** — 1-2 paragraphs
-5. **免责声明** — `<div class="disclaimer">` at bottom
+5. **引用帖子** — markdown table: # / 标题 / URL (auto-generated)
+6. **免责声明** — `<div class="disclaimer">` at bottom
 
 ### Format rules
 | Rule | Example |
@@ -59,19 +94,26 @@ categories: [articles]
 | Tech terms in backticks | `` `R1` ``, `` `BPEL` `` |
 | Product names NO backticks | LangChain, OpenAI, Claude |
 | General concepts NO backticks | agent, framework, API |
-
-### Disclaimer
-```html
-<div class="disclaimer">
-**免责声明**: 原文链接 <URL>. 观点来自 HN 评论者, 不代表本人立场.
-</div>
-```
+| Source annotation (cluster) | `> "text" — user [thread 2]` |
 
 ### Naming
 `_articles/YYYY-MM-DD-hn-keywords.md`
+
+## Phase 2.5 — Fact Check (REQUIRED, no skip)
+
+For each blockquoted quote in the article:
+1. HN Firebase API fetch comment by item id
+2. Compare raw original vs article quote:
+   - Must match verbatim (no paraphrase, no added detail)
+   - Attribution (username) must match
+   - Ellipsis (...) must not change original meaning
+   - CN translation must faithfully reflect EN intent
+3. Fix any flagged discrepancy
+4. Report per quote: ✓ verified / ⚠ fixed / ✗ flagged
 
 ## Phase 3 — Output
 
 1. Save to `_articles/`
 2. `bundle exec jekyll build`
-3. Ask: deploy? -> load auto-deploy skill
+3. If build passes: ask deploy? — load auto-deploy skill
+4. If build fails: report errors, fix, rebuild
