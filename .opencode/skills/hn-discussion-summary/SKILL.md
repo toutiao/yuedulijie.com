@@ -12,14 +12,17 @@ metadata:
 2. Parse stories: title + score + item URL
 3. Filter:
    - score >= 80
-   - dedup: grep item id in `_articles/*.md`
-   - topic: AI/programming/engineering/startup/open source/culture
-4. Show top 5 candidates:
+   - dedup: item id not in `_articles/*.md`
+   - same topic not covered today (grep today's date + keyword)
+4. For each remaining candidate, detect political context:
+   - Check title against political keywords (election, protest, war, sanction, human rights, etc.)
+   - If match, append tag: `⚑ political context`
+5. Show top 5 candidates:
 
    ```
    HN hot candidates:
    [1] Title (N pts)
-   [2] Title (N pts)
+   [2] Title (N pts) ⚑ political context
    ...
 
    Input: number / URL / "n" to skip
@@ -101,6 +104,7 @@ categories: [articles]
 
 ## Phase 2.5 — Fact Check (REQUIRED, no skip)
 
+### Quote verification
 For each blockquoted quote in the article:
 1. HN Firebase API fetch comment by item id
 2. Compare raw original vs article quote:
@@ -111,9 +115,24 @@ For each blockquoted quote in the article:
 3. Fix any flagged discrepancy
 4. Report per quote: ✓ verified / ⚠ fixed / ✗ flagged
 
+### Sensitivity scan
+After quote verification, scan article body for sensitive terms:
+- Match list: `[china/ccp/tiananmen/taiwan/tibet/xinjiang/hong kong]` + `[censorship/surveillance/human rights/propaganda]`
+- Scan article text (including blockquotes, excluding disclaimer)
+- If hit found → tag article `⚑ sensitive`, continue to Phase 3 flagged path
+- If clean → normal path
+
 ## Phase 3 — Output
 
 1. Save to `_articles/`
 2. `bundle exec jekyll build`
-3. If build passes: ask deploy? — load auto-deploy skill
-4. If build fails: report errors, fix, rebuild
+3. If build fails: report errors, fix, rebuild
+4. If build passes, check article tag:
+   - Normal path (no tag): ask deploy? → yes → auto-deploy skill
+   - Flagged path (⚑ sensitive or ⚑ political context):
+     - Show: "⚠ Sensitive topics detected. Extended disclaimer added. Review required."
+     - Show matched terms
+     - Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only."
+     - Ask: "Confirm deploy? [y/N]" (default NO)
+     - y → deploy with extended disclaimer
+     - N → article stays local, not committed
