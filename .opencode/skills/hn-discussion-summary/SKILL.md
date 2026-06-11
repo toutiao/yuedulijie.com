@@ -69,12 +69,12 @@ After post selected or URL given:
 
 ## Phase 2 — Write
 
-### Front matter
+### Front matter (date 自动填充, 禁止手动输入)
 ```
 ---
 layout: post
 title: "Topic — HN discussion digest"
-date: YYYY-MM-DD
+date: $(date +%Y-%m-%d)
 categories: [articles]
 ---
 ```
@@ -126,8 +126,12 @@ After quote verification, scan article body for sensitive terms:
 ## Phase 3 — Output
 
 1. Save to `_articles/`
-2. `bundle exec jekyll build`
-3. If build fails: report errors, fix, rebuild
+2. 验证 date 字段:
+   - `grep "date: $(date +%Y-%m-%d)"` 文章文件
+   - 匹配 → 继续
+   - 不匹配 → 报错 "date field mismatch", 自动修正为当天日期, 重新构建
+3. `bundle exec jekyll build`
+4. If build fails: report errors, fix, rebuild
 4. If build passes, check article tag:
    - Normal path (no tag): ask deploy? → yes → auto-deploy skill
    - Flagged path (⚑ sensitive or ⚑ political context):

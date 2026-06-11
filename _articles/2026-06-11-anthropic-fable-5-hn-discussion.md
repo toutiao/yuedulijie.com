@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Anthropic Fable 5 — HN 讨论集群提炼"
-date: 2026-06-12
+date: 2026-06-11
 categories: [articles]
 ---
 

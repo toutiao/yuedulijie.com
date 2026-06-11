@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "AI agent LLM 话术轰炸击穿 Fedora 审核防线 — HN 讨论提炼"
-date: 2026-06-12
+date: 2026-06-11
 categories: [articles]
 ---
 
