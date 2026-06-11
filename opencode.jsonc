@@ -91,6 +91,25 @@
         },
         "skill": "allow"
       }
+    },
+    "hn-summarizer": {
+      "description": "HN discussion -> Chinese summary article",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "allow",
+        "write": "allow",
+        "edit": "allow",
+        "bash": {
+          "*": "ask",
+          "bundle exec *": "allow",
+          "ls *": "allow"
+        },
+        "skill": "allow"
+      }
     }
   },
   "command": {
@@ -118,6 +137,11 @@
       "template": "List all content in _movies/ (14 posts), _books/ (empty, only .gitkeep), and _essays/ (empty, only .gitkeep).\nCheck for:\n- Missing front matter fields (some movie posts only have `title`)\n- Inconsistent naming conventions (dot-before-year vs plain date)\n- Opportunities to add new content\n- Whether _books/ or _essays/ have actual posts yet",
       "description": "Audit and manage site content",
       "agent": "content-manager"
+    },
+    "hn": {
+      "template": "Load hn-discussion-summary skill. If URL given -> Phase 1-3 (skip scan). If no URL -> Phase 0 (scan HN best) -> show candidates -> user pick -> Phase 1-3. After write: bundle exec jekyll build -> ask deploy.",
+      "description": "Create HN discussion summary article",
+      "agent": "hn-summarizer"
     }
   },
   "instructions": ["AGENTS.md"]

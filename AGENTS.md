@@ -55,6 +55,7 @@ After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
 | jekyll-builder  | custom   | Jekyll build, validation, fix errors          |
 | self-evolve     | custom   | Review and improve agent configurations       |
 | git-publisher   | custom   | Auto-test → stage → commit → push             |
+| hn-summarizer   | custom   | HN discussion → Chinese summary article       |
 
 ## Commands
 | Command   | Description                        | Agent          |
@@ -64,6 +65,7 @@ After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
 | /evolve   | Self-review and improve configs    | self-evolve    |
 | /plan     | Plan next steps                    | project-manager|
 | /content  | Audit and manage content           | content-manager|
+| /hn       | Create HN discussion summary article| hn-summarizer |
 
 ## Workflow
 1. Make changes (content, config, layout)
