@@ -221,4 +221,34 @@ article main {
     border-left: #CCC solid 2px;
     padding: .8rem;
   }
+
+  .post-content {
+    font-size: 16px;
+    line-height: 1.7;
+
+    blockquote {
+      margin: 1.5em 0;
+      padding: 0.5em 1.2em;
+      border-left: 3px solid #ddd;
+      background: #f9f9f9;
+
+      p {
+        margin: 0.4em 0;
+        text-indent: 0;
+
+        &:not(:first-child) {
+          color: #888;
+          font-size: 0.9em;
+        }
+      }
+    }
+
+    h2 + p,
+    h3 + p,
+    h4 + p,
+    h5 + p,
+    h6 + p {
+      text-indent: 0;
+    }
+  }
 }
