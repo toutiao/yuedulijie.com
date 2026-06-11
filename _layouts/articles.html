@@ -1,0 +1,10 @@
+---
+layout: default
+---
+{{ content }}
+
+<main class="container">
+  <h2>{{ page.title | escape }}</h2>
+
+  {% include articles.html posts=site.articles -%}
+</main>

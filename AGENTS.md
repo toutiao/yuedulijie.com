@@ -18,12 +18,14 @@ _layouts/        # Page/post layouts (Liquid)
 _movies/         # Movie review collection (14 posts)
 _books/          # Book review collection (empty)
 _essays/         # Essay collection (empty)
+_articles/       # Article reading notes collection (empty)
 _sass/           # SCSS partials
 assets/          # CSS (SCSS), JS, favicon
 index.html       # Home page
 archives.html    # Archive page
 books.html       # Books listing
 movies.html      # Movies listing
+articles.html   # Articles listing
 Gemfile          # Ruby dependencies
 Gemfile.lock     # Gem dependency lock (committed for reproducible builds)
 .github/         # CI/CD workflows
@@ -35,6 +37,7 @@ Gemfile.lock     # Gem dependency lock (committed for reproducible builds)
 | movies     | `_movies/`  | /movies/:year/:name        | —                |
 | books      | `_books/`   | /books/:year/:name         | —                |
 | essays     | `_essays/`  | /essays/:name              | 深井兵太郎       |
+| articles   | `_articles/`| /articles/:year/:name      | —                |
 
 ## File Naming Convention
 ```

@@ -16,6 +16,9 @@ collections:
   books:
     output: true
     permalink: /:collection/:year/:name
+  articles:
+    output: true
+    permalink: /:collection/:year/:name
 
 defaults:
   -
@@ -43,6 +46,13 @@ defaults:
       type: books
     values:
       categories: [books]
+      layout: "post"
+  -
+    scope:
+      path: "_articles"
+      type: articles
+    values:
+      categories: [articles]
       layout: "post"
   -
     scope:
