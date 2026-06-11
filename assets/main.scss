@@ -273,11 +273,18 @@ main.container.home {
 
     .card {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 1.5em 0.8em;
       text-align: center;
 
-      h3 { font-size: 1em; font-weight: 400; margin: 0 0 0.3em; }
+      h3 { font-size: 1em; font-weight: 400; margin: 0 0 0.5em; color: #888; }
       .count { font-size: 2.5em; color: #ccc; font-weight: 200; margin: 0.2em 0; }
-      .latest { font-size: 0.85em; color: #999; }
+      .latest { font-size: 0.85em; color: #999; margin: 0.5em 0 0; }
     }
 
     .badge-latest {
