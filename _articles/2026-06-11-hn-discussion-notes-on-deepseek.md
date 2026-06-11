@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "HN 讨论：Notes on DeepSeek — 提炼总结"
+title: "Notes on DeepSeek — HN 讨论提炼"
 date: 2026-06-11
 categories: [articles]
 ---
