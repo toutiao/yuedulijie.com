@@ -61,13 +61,16 @@ metadata:
   `git push origin master` — 不译
 ```
 
-## 5. Article Independence
+## 5. Article Independence (Series Blindness)
 
 ```
-- Each article self-contained. No cross-references to other articles in series.
-- Never use: 如前文所述 / 在上一篇中 / 与之前的 XX 不同
-- Do not assume reader has read other articles in series
-- Background info fully explained within each article
+- 禁止提及本系列其他文章. 无论通过标题、主题、对比、还是"如前文所述".
+- Do NOT use: 前文 / 上篇 / 另一篇 / 本期 / 本系列 / 与本系列其他文章不同
+- Do NOT reference other articles by name: DeepSeek, Burr, Fable, Fedora, etc.
+- Do NOT compare current discussion to previous articles: "与XX不同", "与XX呼应"
+- Each article must be fully readable as if no other articles in the series exist.
+  → 如果某条信息不在本篇文章中交代清楚, 就是不独立.
+- 背景信息每篇内部完整交代, 不依赖读者看过其他文章.
 ```
 
 ## 6. Reference Article (TBD)
