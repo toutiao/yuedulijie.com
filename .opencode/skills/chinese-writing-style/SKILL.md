@@ -59,6 +59,19 @@ metadata:
 
 - Code/commands: keep original, do NOT translate
   `git push origin master` — 不译
+
+### Post-quote discussion
+
+Quote + translation 之后, 用你自己的话点一句:
+- 这句为什么有意思? (洞察)
+- 有没有例子/反例帮你理解? (通俗)
+- 它指向什么更大的问题? (但不要强行上价值)
+
+Three-layer structure:
+Quote (信源) → Translation (能懂) → Discussion (秒懂)
+
+规则: 如果想不到一句人话让读者"哦"一声, 就别写讨论段.
+宁可没有, 也不要强行深刻. 通俗 > 深刻.
 ```
 
 ## 5. Article Independence (Series Blindness)
