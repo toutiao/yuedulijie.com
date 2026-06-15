@@ -72,6 +72,14 @@ Quote (信源) → Translation (能懂) → Discussion (秒懂)
 
 规则: 如果想不到一句人话让读者"哦"一声, 就别写讨论段.
 宁可没有, 也不要强行深刻. 通俗 > 深刻.
+
+### Quote protection
+
+Blockquote 内英文原文必须保持原样.
+- 不得改写、润色、简化引文中的任何单词
+- 不得对引文应用本 skill 的任何风格规则 (标点/术语/语气)
+- 仅翻译行和讨论段落受本 skill 约束
+- 引文作者原文是信源, 不可侵犯
 ```
 
 ## 5. Article Independence (Series Blindness)
