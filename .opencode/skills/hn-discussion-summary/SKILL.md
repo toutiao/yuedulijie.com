@@ -70,6 +70,7 @@ After post selected or URL given:
 ## Phase 2 — Write
 
 Before writing, load chinese-writing-style skill.
+(引文原文不受 style 约束, 保持原样. 翻译和讨论段受约束.)
 
 ### Front matter (date 自动填充, 禁止手动输入)
 ```
