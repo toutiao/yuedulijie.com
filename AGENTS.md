@@ -1,83 +1,68 @@
 # yuedulijie.com — 阅读理解
 
 ## Stack
-- Jekyll static site, GitHub Pages deployment
-- Domain: https://yuedulijie.com
-- Branch: `master` (deployed directly to Pages)
-- Ruby gem: `github-pages`
-- **Local dev**: Docker (ruby:3.2-slim), no local Ruby needed
-- **CI/CD**: GitHub Actions (`.github/workflows/deploy.yml`), auto-deploys on push to master
+- Jekyll + GitHub Pages (branch `master`, auto-deployed)
+- Domain: `yuedulijie.com`
+- **Local dev**: Docker (ruby:3.2-slim, `docker compose`), **no** local Ruby/Jekyll needed
+- **CI**: `.github/workflows/deploy.yml` — push to master → build → Pages
 - **Sub-site**: [UP-6 英语学习导航](https://up-6.yuedulijie.com) — `github.com/Lax/up-6.yuedulijie.com`
 
 ## Project Layout
 ```
-_config.yml      # Site config (title, collections, plugins)
-CNAME            # Custom domain: yuedulijie.com
-_includes/       # Reusable HTML fragments
-_layouts/        # Page/post layouts (Liquid)
-_movies/         # Movie review collection (14 posts)
-_books/          # Book review collection (empty)
-_essays/         # Essay collection (empty)
-_articles/       # Article reading notes collection (empty)
-_sass/           # SCSS partials
-assets/          # CSS (SCSS), JS, favicon
-index.html       # Home page
-archives.html    # Archive page
-books.html       # Books listing
-movies.html      # Movies listing
-articles.html   # Articles listing
-Gemfile          # Ruby dependencies
-Gemfile.lock     # Gem dependency lock (committed for reproducible builds)
-.github/         # CI/CD workflows
+_config.yml       # Site config, collections, permalinks, plugins
+_includes/        # Reusable Liquid fragments (header, per-collection listing)
+_layouts/         # Layouts: default, post, page, home, per-collection pages
+_movies/ (14)     # Movie reviews
+_books/ (0)       # Book reviews (empty)
+_essays/ (0)      # Essays (empty)
+_articles/ (13)   # HN discussion summary articles (populated Jun 2026)
+_sass/            # SCSS source (empty — styles in assets/main.scss)
+assets/           # main.scss (entry, has front matter), main.js, favicon
 ```
+Nav pages (`movies.html`, `books.html`, `articles.html`) use `nav: true` in front matter. `archives.html` is hardcoded in header, not nav.
 
-## Collections
-| Collection | Path        | Permalink                  | Author (default) |
-|------------|-------------|----------------------------|------------------|
-| movies     | `_movies/`  | /movies/:year/:name        | —                |
-| books      | `_books/`   | /books/:year/:name         | —                |
-| essays     | `_essays/`  | /essays/:name              | 深井兵太郎       |
-| articles   | `_articles/`| /articles/:year/:name      | —                |
+## Collections & Permalinks
+| Collection | Path | Permalink | Notes |
+|---|---|---|---|
+| movies | `_movies/` | `/movies/:year/:name` | No default author |
+| books | `_books/` | `/books/:year/:name` | No default author |
+| essays | `_essays/` | `/essays/:name` | Default author: `深井兵太郎` |
+| articles | `_articles/` | `/articles/:year/:name` | No default author |
 
-## File Naming Convention
-```
-YYYY-MM-DD-title-with-hyphens.md
-After 2024-03, movies use dots before year: YYYY-MM-DD-title.YEAR.md
-```
+## Front Matter Patterns
+- **Movies**: minimal — usually only `title:` (no `layout`, `date`, `categories` in older posts)
+- **Articles** (HN summaries): `layout: post`, `title:`, `date:`, `categories: [articles]`
+- **Essays**: default author `深井兵太郎` from `_config.yml`
+- **Nav pages**: `layout: <type>`, `title:`, `nav: true`
 
-## Agents
-| Agent           | Type     | Role                                          |
-|-----------------|----------|-----------------------------------------------|
-| build (default) | built-in | Standard development agent                    |
-| plan            | built-in | Analysis & planning (no edits)                |
-| project-manager | custom   | Strategy, backlog, agent coordination         |
-| content-manager | custom   | Content audit and management                  |
-| jekyll-builder  | custom   | Jekyll build, validation, fix errors          |
-| self-evolve     | custom   | Review and improve agent configurations       |
-| git-publisher   | custom   | Auto-test → stage → commit → push             |
-| hn-summarizer   | custom   | HN discussion → Chinese summary article       |
+## File Naming
+- `YYYY-MM-DD-title-with-hyphens.md`
+- After 2024-03, **movies** add a dot before year: `YYYY-MM-DD-title.YEAR.md`
+- **Articles** (HN summaries): `_articles/YYYY-MM-DD-hn-keywords.md`
 
 ## Commands
-| Command   | Description                        | Agent          |
-|-----------|------------------------------------|----------------|
-| /test     | Build & validate Jekyll site       | jekyll-builder |
-| /deploy   | Build, commit & push to GitHub     | git-publisher  |
-| /evolve   | Self-review and improve configs    | self-evolve    |
-| /plan     | Plan next steps                    | project-manager|
-| /content  | Audit and manage content           | content-manager|
-| /hn       | Create HN discussion summary article| hn-summarizer |
+| Command | Action | Agent |
+|---|---|---|
+| `/test` | `make build` (Docker) — validate site compiles | jekyll-builder |
+| `/deploy` | Build → stage → commit (Chinese msg) → push master | git-publisher |
+| `/plan` | Analyze project, suggest next work | project-manager |
+| `/content` | Audit collections and front matter | content-manager |
+| `/evolve` | Self-review agent configs, skills, infrastructure | self-evolve |
+| `/hn [url]` | Create HN discussion summary → `_articles/` | hn-summarizer |
 
-## External API Restrictions
+## Dev Workflow
+1. Edit content/config/layout
+2. `make build` (or `docker compose run --rm build`) — validates in Docker
+3. `make serve` (or `docker compose up jekyll`) — live at http://localhost:4000
+4. Commit & push to master — GH Actions auto-deploys
 
-Third-party APIs permanently banned:
-- HN Firebase API (`firebaseio.com/v0/`)
-- HN Algolia Search API (`hn.algolia.com`)
+Build env: `JEKYLL_ENV=production` (build), `development` (serve). Persisted gem volume: `bundle_data`.
 
-All HN data acquisition: `webfetch` ONLY. No agent, skill, command, or script may use these APIs for any purpose. Hard constraint.
+## Commit Style
+Conventional commits in Chinese: `feat:`, `fix:`, `style:`, `docs:`, `refactor:` prefixes. Always build first. `make deploy msg='...'` does build → `git add -A` → commit → push in one step.
 
-## Workflow
-1. Make changes (content, config, layout)
-2. Run `/test` to validate build locally (Docker)
-3. Run `/deploy` to commit and push — GitHub Actions auto-builds and deploys
-4. Periodically run `/evolve` to improve agents
-5. Run `/plan` to decide what to work on next
+## External API Restrictions (Hard)
+HN data via **`webfetch` ONLY**. Banned forever: `firebaseio.com/v0/`, `hn.algolia.com`.
+
+## Plugin
+Only `jekyll-seo-tag`. HTML compression via `compress_html` in `_config.yml` (production only).
