@@ -1,4 +1,4 @@
-.PHONY: build serve test deploy clean
+.PHONY: build build-fast serve test deploy clean
 
 build:
 	docker compose run --rm build
@@ -24,3 +24,8 @@ shell:
 
 logs:
 	docker compose logs -f
+
+build-fast:
+	APT_MIRROR=mirrors.aliyun.com \
+	GEM_MIRROR=https://gems.ruby-china.com \
+	docker compose run --rm build

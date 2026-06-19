@@ -1,5 +1,5 @@
 ---
-layout: nil
+layout: none
 ---
 
 var target = document.getElementsByClassName("sticky-top")[0];

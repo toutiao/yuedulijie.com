@@ -101,6 +101,7 @@
         "glob": "allow",
         "grep": "allow",
         "webfetch": "allow",
+        "websearch": "allow",
         "write": "allow",
         "edit": "allow",
         "bash": {
