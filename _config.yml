@@ -1,4 +1,5 @@
 title: 阅读理解
+description: "中文阅读笔记 — 电影、书籍、文章与技术随笔"
 
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://yuedulijie.com"
@@ -60,6 +61,11 @@ defaults:
     values:
       layout: "post"
       author: "深井兵太郎"
+
+github:
+  build_revision: "dev"
+  environment: "development"
+  url: "https://yuedulijie.com"
 
 plugins:
   - jekyll-seo-tag
