@@ -13,6 +13,7 @@ require 'net/http'
 require 'uri'
 require 'json'
 require 'nokogiri'
+require 'set'
 require 'date'
 require 'fileutils'
 
@@ -48,7 +49,7 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
       'User-Agent' => 'Mozilla/5.0 (compatible; HNAutoSummarizer/1.0)'
     )
     http.request(request).body.force_encoding('UTF-8')
-  rescue Net::TimeoutError, Net::OpenTimeout,
+  rescue Net::ReadTimeout, Net::OpenTimeout,
          Errno::ECONNREFUSED, Errno::ECONNRESET => e
     retries += 1
     if retries <= max_retries
@@ -93,7 +94,7 @@ def call_gemini(system_prompt, user_prompt)
 
     warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
     text
-  rescue Net::TimeoutError, Net::OpenTimeout => e
+  rescue Net::ReadTimeout, Net::OpenTimeout => e
     retries += 1
     if retries <= 2
       sleep retries * 5
