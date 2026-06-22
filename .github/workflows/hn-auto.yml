@@ -26,7 +26,7 @@ jobs:
           git config user.name "HN Auto-Summarizer"
           git config user.email "hn-auto@yuedulijie.com"
           git remote set-url origin \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+            "https://x-access-token:${{ secrets.PAT_FOR_DEPLOY }}@github.com/${{ github.repository }}"
 
       - name: Run HN Auto-Summarizer
         env:
