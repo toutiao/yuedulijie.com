@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Claude 身份验证 — HN 讨论摘要"
-date: 2024-07-29
+date: 2026-06-22
 categories: [articles]
 ---
 

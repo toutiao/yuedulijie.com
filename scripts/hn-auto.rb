@@ -466,7 +466,9 @@ def write_article(text, story_title, article_date, hn_url)
   filename = "#{today_str}-hn-#{slugify(story_title)}.md"
   filepath = File.join(ARTICLES_DIR, filename)
 
-  unless text.start_with?("---")
+  if text.start_with?("---")
+    text = text.sub(/^date:.*$/, "date: #{today_str}")
+  else
     article_title = "#{story_title} — HN 讨论摘要"
     front_matter = <<~FM
       ---

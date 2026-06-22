@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "UHF X11: X11 Built for VisionOS and Apple Vision Pro — HN 讨论摘要"
-date: 2023-10-27
+date: 2026-06-22
 categories: [articles]
 ---
 
