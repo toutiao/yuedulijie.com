@@ -60,14 +60,14 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
   end
 end
 
-def call_gemini(system_prompt, user_prompt)
+def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
   uri = URI("https://generativelanguage.googleapis.com/v1beta/models/" \
             "#{GEMINI_MODEL}:generateContent?key=#{GEMINI_API_KEY}")
 
   body = {
     system_instruction: { parts: [{ text: system_prompt }] },
     contents: [{ parts: [{ text: user_prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 4096 }
+    generationConfig: { temperature: temperature, maxOutputTokens: max_tokens }
   }
 
   retries = 0
@@ -178,16 +178,45 @@ def extract_discussion(hn_url)
   story_title = title_el&.text&.strip || "HN Discussion"
 
   comments = []
-  doc.css('.commtext').each do |el|
-    username_el = el.ancestors('tr').first&.at_css('.comhead a')
-    username = username_el&.text&.strip || 'anonymous'
-    text = el.text.strip
+  doc.css('tr.athing.comtr').each do |row|
+    comment_id = row['id']
+    next unless comment_id
+
+    user_el = row.at_css('.hnuser')
+    username = user_el&.text&.strip || 'anonymous'
+
+    score = 0
+    score_el = row.at_css('.score')
+    if score_el
+      m = score_el.text.match(/(\d+)/)
+      score = m[1].to_i if m
+    end
+
+    text_el = row.at_css('.commtext')
+    text = text_el&.text&.strip || ''
     next if text.empty?
-    comments << "@#{username}: #{text}"
+
+    comments << { id: comment_id, score: score, user: username, text: text }
   end
 
-  text = "Title: #{story_title}\nURL: #{hn_url}\n\n"
-  text += "--- Comments (#{comments.length}) ---\n#{comments.join("\n\n")}" unless comments.empty?
+  # Filter low-scored comments
+  active = comments.select { |c| c[:score] > 1 }
+
+  # Sort by score desc, cap at 40
+  if active.length > 20
+    active = active.sort_by { |c| -c[:score] }.first(40)
+  end
+
+  # Build structured output
+  lines = ["Title: #{story_title}", "URL: #{hn_url}", ""]
+  active.each do |c|
+    lines << "[comment: #{c[:id]} | score: #{c[:score]} | user: #{c[:user]}]"
+    lines << c[:text]
+    lines << "---"
+  end
+  text = lines.join("\n")
+  text = text[0...80_000] + "\n\n[...truncated]" if text.length > 80_000
+
   [text, story_title]
 end
 
@@ -203,13 +232,14 @@ categories: [articles]
 
 ## 原文概要
 
-[简要介绍原文内容(2-3段)，注明文章来源]
+[简要介绍原文内容(2-3段)，注明来源："HN 热门榜 (/best)"]
 
 ## 讨论焦点
 
 ### 焦点标题
 
-> "英文原文引用" — 用户名
+> "英文原文引用" — 用户名 [comment: 12345678]
+> （中文翻译）
 
 中文分析...
 
@@ -239,24 +269,190 @@ EXAMPLE
 SYSTEM_PROMPT = <<~PROMPT
 你是一个专业的中文科技新闻摘要编辑。你的任务是根据 Hacker News 讨论内容撰写一篇中文摘要文章。
 
-格式要求（必须严格遵守）：
-1. Jekyll front matter: layout: post, title, date, categories: [articles]
-2. 标题格式: "{原文标题} — HN 讨论摘要"
-3. 章节（按顺序）：
-   - ## 原文概要（2-3段，介绍原文 + HN 讨论概况，注明来源）
-   - ## 讨论焦点（3-5个焦点，用 > 引用原文评论+用户名，配中文分析）
-   - ## 典型观点一览（markdown 表格，列：立场 | 用户 | 一句话，至少4行）
-   - ## 总体情绪（总结 + **总体情绪：[标签]**）
-   - ## 引用帖子（表格：| # | 标题 | URL |，至少3行）
-   - <div class="disclaimer">...</div>
-4. 引用必须原文英文 + 中文翻译
-5. 简体中文，客观中立
-6. 不要用 emoji
-7. 不要添加额外的说明文字，直接输出完整文章
+## 格式要求（必须严格遵守）
+
+### Front matter
+---
+layout: post
+title: "{原文标题} — HN 讨论摘要"
+date: {当前日期}
+categories: [articles]
+---
+
+### 章节顺序
+1. ## 原文概要（2-3 段，介绍原文内容 + HN 讨论概况，注明来源 "HN 热门榜 (/best)"）
+2. ## 讨论焦点（3-5 个焦点，每个焦点用 ### 副标题）
+3. ## 典型观点一览（markdown 表格：立场 | 用户 | 一句话，至少 4 行）
+4. ## 总体情绪（1-2 段总结 + **总体情绪：[积极/消极/中性/争议性]**）
+5. ## 引用帖子（表格：# | 标题 | URL，至少 3 行，列出原始 HN 帖和相关参考链接）
+6. <div class="disclaimer">...</div>
+
+### 引用格式
+- 引文原文与 attribution 同一行：> "text" — username [comment: NNNNNN]
+- comment id 取自每条评论的标题行（如 [comment: 12345678 | score: 5 | user: john]），放在 attribution 之后
+- 中文翻译另起一行
+- 引文原文必须保持原样，不得改写、润色、简化
+
+### 格式规则
+- 技术术语加 backtick：`R1` / `BPEL` / `agent` / `prompt`
+- 产品名不加 backtick：LangChain, OpenAI, Claude
+- 通用概念不加 backtick：agent, framework, API
+
+### 中文写作规范
+- 中文正文使用全角引号 ""
+- 英文术语保持原样，首字母大写
+- 通用概念使用中文：维护者 / 代码审查 / 开源项目
+- 不翻译：品牌名、文件名、版本号、命令
+- 客观语气，不使用"竟然""令人震惊""不得不"等情绪词
+- 引用 attribution 使用"表示""指出""认为"，不使用"声称""宣称"
+- 每段不超过 5 行
+- 每篇文章独立可读，不依赖本系列其他文章，不提及"前文""上篇""本系列"
+- 讨论段：一句话点明引文的洞察或指向的问题。想不到就不写，宁可没有也不要强行深刻
+
+### 其他
+- 简体中文
+- 不要用 emoji
+- 不要添加额外说明文字，直接输出完整文章
 
 参考示例：
 #{EXAMPLE_ARTICLE}
 PROMPT
+
+# ── Layered Generation (Phase C) ──────────────────────────────────
+
+def call_gemini_layered(discussion_with_ids, story_title)
+  # Pass 1: Theme clustering (compact, low temp)
+  puts "  Pass 1: Theme clustering..."
+  cluster_system = "你是一个讨论分析助手。将评论按主题分组，输出紧凑的分组结果。"
+  cluster_user = <<~PROMPT
+    将以下 HN 讨论评论归纳为 3-5 个主题分组。
+
+    对每个主题输出：
+    ## 主题名称 — 简要描述
+    - [comment: id] 用户名: 核心观点（一句话）
+
+    只输出分组结果，不要额外说明。
+
+    讨论内容：
+    #{discussion_with_ids}
+  PROMPT
+
+  clusters = call_gemini(cluster_system, cluster_user, temperature: 0.1, max_tokens: 2000)
+
+  # Extract comment IDs from clusters, filter discussion to subset
+  cluster_ids = clusters.scan(/\[comment:\s*(\d+)\]/).flatten.to_set
+  filtered_lines = []
+  keep = false
+  discussion_with_ids.each_line do |line|
+    if line.start_with?('[comment:')
+      cid = line[/\[comment:\s*(\d+)\]/, 1]
+      keep = cid && cluster_ids.include?(cid)
+    end
+    filtered_lines << line if keep
+  end
+  filtered_discussion = filtered_lines.join
+
+  warn "  Clusters cover #{cluster_ids.size} comments (filtered from full discussion)"
+
+  # Pass 2: Article with cluster guidance
+  puts "  Pass 2: Generating article..."
+  article_user = <<~PROMPT
+    请为以下 Hacker News 讨论生成中文摘要文章。
+
+    讨论主题分组（作为文章结构参考）：
+    #{clusters}
+
+    各主题下的原始评论（供精确引用，保留 comment id）：
+    #{filtered_discussion}
+  PROMPT
+
+  call_gemini(SYSTEM_PROMPT, article_user)
+end
+
+# ── Post-generation checks ────────────────────────────────────────
+
+def verify_quotes(article_text)
+  results = []
+  article_text.scan(/\[comment:\s*(\d+)\]/).flatten.uniq.each do |cid|
+    begin
+      comment_page = fetch("https://news.ycombinator.com/item?id=#{cid}")
+      doc = Nokogiri::HTML(comment_page)
+      comment_row = doc.at_css("tr.athing.comtr[id='#{cid}']")
+      unless comment_row
+        results << { status: '⚠', message: "comment #{cid} not found on HN" }
+        next
+      end
+
+      original_text = comment_row.at_css('.commtext')&.text&.strip || ''
+      original_user = comment_row.at_css('.hnuser')&.text&.strip || ''
+
+      line = article_text.lines.find { |l| l.include?("[comment: #{cid}]") }
+      unless line
+        results << { status: '⚠', message: "comment #{cid} not found in article text" }
+        next
+      end
+
+      quoted = line[/"([^"]*)"/, 1] || ''
+      article_user = line[/—\s*(\S+)/, 1] || ''
+
+      mismatches = []
+      norm_orig = original_text.gsub(/\s+/, ' ')
+      norm_quote = quoted.gsub(/\s+/, ' ')
+      unless norm_orig.include?(norm_quote) || norm_quote.include?(norm_orig[0..[norm_quote.length, norm_orig.length].min])
+        mismatches << "text mismatch"
+      end
+
+      unless article_user.downcase == original_user.downcase
+        mismatches << "user mismatch: article=#{article_user}, original=#{original_user}"
+      end
+
+      if mismatches.empty?
+        results << { status: '✓', message: "comment #{cid} — #{article_user}" }
+      else
+        results << { status: '⚠', message: "comment #{cid} — #{mismatches.join(', ')}" }
+      end
+    rescue => e
+      results << { status: '⚠', message: "comment #{cid} — error: #{e.message}" }
+    end
+  end
+  results
+end
+
+SENSITIVE_LEFT = %w[china ccp tiananmen taiwan tibet xinjiang hong_kong]
+SENSITIVE_RIGHT = %w[censorship surveillance human_rights propaganda]
+
+def sensitivity_scan(text)
+  disclaimer_section = text.match(/<div class="disclaimer">.*?<\/div>/m)
+  body = disclaimer_section ? text.sub(disclaimer_section.to_s, '') : text
+  body_lower = body.downcase.gsub(' ', '_')
+
+  SENSITIVE_LEFT.each do |left|
+    left_idx = body_lower.index(left)
+    next unless left_idx
+    SENSITIVE_RIGHT.each do |right|
+      right_idx = body_lower.index(right, left_idx)
+      next unless right_idx
+      if right_idx - left_idx <= 200
+        warn "  ⚑ SENSITIVE: '#{left.tr('_', ' ')}' near '#{right.tr('_', ' ')}' (#{right_idx - left_idx} chars)"
+        warn "    context: ...#{body[left_idx..right_idx + right.length].tr('_', ' ')}..."
+        return true
+      end
+    end
+  end
+  false
+end
+
+def append_extended_disclaimer(filepath)
+  text = File.read(filepath)
+  extended = '<br>This article involves topics of public debate. Content presented for informational purposes only.'
+  if text.include?('</div>')
+    text.sub!('</div>', "#{extended}\n</div>")
+    File.write(filepath, text)
+    true
+  else
+    false
+  end
+end
 
 def slugify(title)
   words = title.scan(/[a-zA-Z0-9]+/)
@@ -333,16 +529,33 @@ def process_story(hn_url, date:, idx: nil)
   puts "  Fetching discussion..."
   discussion, title = extract_discussion(hn_url)
 
-  if discussion.length > 80_000
-    discussion = discussion[0...80_000] + "\n\n[...truncated]"
+  comment_count = discussion.scan(/\[comment: \d+\]/).length
+
+  if comment_count > 50
+    puts "  Large discussion (#{comment_count} comments), using two-pass..."
+    article = call_gemini_layered(discussion, title)
+  else
+    puts "  Calling Gemini API..."
+    article = call_gemini(SYSTEM_PROMPT,
+      "请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
   end
 
-  puts "  Calling Gemini API..."
-  article = call_gemini(SYSTEM_PROMPT,
-    "请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
-
   puts "  Writing article..."
-  write_article(article, title, date, hn_url)
+  filepath = write_article(article, title, date, hn_url)
+
+  puts "  Verifying quotes..."
+  results = verify_quotes(File.read(filepath))
+  results.each { |r| puts "    #{r[:status]} #{r[:message]}" }
+
+  puts "  Running sensitivity scan..."
+  if sensitivity_scan(File.read(filepath))
+    append_extended_disclaimer(filepath)
+    puts "    ⚑ Sensitive topics detected, extended disclaimer added"
+  else
+    puts "    ✓ Clean"
+  end
+
+  filepath
 end
 
 def run
