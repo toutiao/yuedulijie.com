@@ -15,6 +15,6 @@
   {%- endif -%}
 <div class="day-title">
   <div class="day"><p title="{{ day }}">{{ post.date | date: "%e" }}</p></div>
-  <div class="post-title"><p><a href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a></p></div>
+  <div class="post-title"><p><a href="{{ post.url | prepend: site.baseurl }}"{% if post.tagline %} title="{{ post.tagline }}"{% endif %}>{{ post.title }}</a></p></div>
 </div>
 {%- endfor -%}

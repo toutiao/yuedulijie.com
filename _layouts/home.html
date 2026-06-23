@@ -76,7 +76,7 @@ layout: default
         {% elsif post.collection == "articles" %}文章
         {% elsif post.collection == "essays" %}随笔{% endif %}
       </span>
-      <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+      <a href="{{ post.url | relative_url }}"{% if post.tagline %} title="{{ post.tagline }}"{% endif %}>{{ post.title }}</a>
     </div>
     {% endfor %}
   </section>
