@@ -3,6 +3,8 @@ layout: post
 title: "AI 品牌营销引发消费者反感 — HN 讨论综述"
 date: 2026-06-19
 categories: [articles]
+excerpt: "60% 消费者认为品牌中出现 AI 字样会让他们反感。HN 讨论了为什么管理层明知体验差仍然强行推进。"
+tagline: "把 AI 从营销文案里删掉，产品销量立涨 60%。"
 ---
 
 ## 原文概要

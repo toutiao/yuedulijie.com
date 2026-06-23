@@ -3,6 +3,8 @@ layout: post
 title: "Notes on DeepSeek — HN 讨论提炼"
 date: 2026-06-11
 categories: [articles]
+excerpt: "参观 DeepSeek 杭州总部的见闻：300 人公司无意扩张，不关心 AGI 接管。HN 讨论集中在中美 AI 文化的根本差异上。"
+tagline: "美国 AI 公司忙着造神，DeepSeek 忙着写代码——然后卖得比你便宜十倍。"
 ---
 
 ---

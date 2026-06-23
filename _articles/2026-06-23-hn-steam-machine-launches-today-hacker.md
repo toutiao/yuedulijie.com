@@ -3,6 +3,8 @@ layout: post
 title: "Steam Machine launches today — HN 讨论摘要"
 date: 2026-06-23
 categories: [articles]
+excerpt: "Valve 在 2014 年推出 Steam Machine 试图挑战主机市场。HN 社区讨论了它的市场定位、Linux 游戏生态和 SteamOS 前景。"
+tagline: "Valve 十年前就想用 Linux 主机干掉 PlayStation，结果自己先鸽了。"
 ---
 
 ## 原文概要

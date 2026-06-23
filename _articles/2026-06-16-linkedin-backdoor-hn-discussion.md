@@ -3,6 +3,8 @@ layout: post
 title: "LinkedIn 招聘中的后门 — HN 讨论提炼"
 date: 2026-06-16
 categories: [articles]
+excerpt: "安全研究员在 LinkedIn 遇到招聘骗局：面试任务是安装后门。HN 警示这是朝鲜 Lazarus 集团的攻击手法。"
+tagline: "投了半年简历没人回，来了一份面试邀约却想黑你的电脑。"
 ---
 
 ## 原文概要

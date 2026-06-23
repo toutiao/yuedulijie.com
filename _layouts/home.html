@@ -6,42 +6,55 @@ layout: default
 <main class="container home">
   <h1>{{ site.title }}</h1>
 
+  {%- assign parts = "" | split: "" -%}
+  {%- if site.movies.size > 0 -%}{%- capture p -%}{{ site.movies.size }} 部电影{%- endcapture -%}{%- assign parts = parts | push: p -%}{%- endif -%}
+  {%- if site.books.size > 0 -%}{%- capture p -%}{{ site.books.size }} 本书籍{%- endcapture -%}{%- assign parts = parts | push: p -%}{%- endif -%}
+  {%- if site.articles.size > 0 -%}{%- capture p -%}{{ site.articles.size }} 篇文章{%- endcapture -%}{%- assign parts = parts | push: p -%}{%- endif -%}
+  {%- if site.essays.size > 0 -%}{%- capture p -%}{{ site.essays.size }} 篇随笔{%- endcapture -%}{%- assign parts = parts | push: p -%}{%- endif -%}
+  <p class="summary-line">{{ parts | join: " · " }}</p>
+
   <section class="section-overview">
-    <div class="card">
-      <h3>电影</h3>
-      <span class="count">{{ site.movies.size }}</span>
-      {% assign latest = site.movies | sort: "date" | last %}
-      {% if latest %}
-      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
-      {% endif %}
-    </div>
 
+  {%- if site.movies.size > 0 -%}
+    {%- assign latest = site.movies | sort: "date" | last -%}
     <div class="card">
-      <h3>书籍</h3>
-      <span class="count">{{ site.books.size }}</span>
-      {% assign latest = site.books | sort: "date" | last %}
-      {% if latest %}
-      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
-      {% endif %}
+      <div class="card-header"><h3>电影</h3><span class="count">{{ site.movies.size }}</span></div>
+      <a class="latest-title" href="{{ latest.url | relative_url }}"{% if latest.tagline %} title="{{ latest.tagline }}"{% endif %}>{{ latest.title }}</a>
+      {%- if latest.excerpt -%}<p class="excerpt">{{ latest.excerpt | strip_newlines | truncate: 120 }}</p>{%- endif -%}
+      <div class="card-footer"><a href="/movies.html">所有电影 →</a></div>
     </div>
+  {%- endif -%}
 
+  {%- if site.books.size > 0 -%}
+    {%- assign latest = site.books | sort: "date" | last -%}
     <div class="card">
-      <h3>文章</h3>
-      <span class="count">{{ site.articles.size }}</span>
-      {% assign latest = site.articles | sort: "date" | last %}
-      {% if latest %}
-      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
-      {% endif %}
+      <div class="card-header"><h3>书籍</h3><span class="count">{{ site.books.size }}</span></div>
+      <a class="latest-title" href="{{ latest.url | relative_url }}"{% if latest.tagline %} title="{{ latest.tagline }}"{% endif %}>{{ latest.title }}</a>
+      {%- if latest.excerpt -%}<p class="excerpt">{{ latest.excerpt | strip_newlines | truncate: 120 }}</p>{%- endif -%}
+      <div class="card-footer"><a href="/books.html">所有书籍 →</a></div>
     </div>
+  {%- endif -%}
 
+  {%- if site.articles.size > 0 -%}
+    {%- assign latest = site.articles | sort: "date" | last -%}
     <div class="card">
-      <h3>随笔</h3>
-      <span class="count">{{ site.essays.size }}</span>
-      {% assign latest = site.essays | sort: "date" | last %}
-      {% if latest %}
-      <p class="latest"><span class="badge-latest">最新</span><a href="{{ latest.url | relative_url }}">{{ latest.title }}</a></p>
-      {% endif %}
+      <div class="card-header"><h3>文章</h3><span class="count">{{ site.articles.size }}</span></div>
+      <a class="latest-title" href="{{ latest.url | relative_url }}"{% if latest.tagline %} title="{{ latest.tagline }}"{% endif %}>{{ latest.title }}</a>
+      {%- if latest.excerpt -%}<p class="excerpt">{{ latest.excerpt | strip_newlines | truncate: 120 }}</p>{%- endif -%}
+      <div class="card-footer"><a href="/articles.html">所有文章 →</a></div>
     </div>
+  {%- endif -%}
+
+  {%- if site.essays.size > 0 -%}
+    {%- assign latest = site.essays | sort: "date" | last -%}
+    <div class="card">
+      <div class="card-header"><h3>随笔</h3><span class="count">{{ site.essays.size }}</span></div>
+      <a class="latest-title" href="{{ latest.url | relative_url }}"{% if latest.tagline %} title="{{ latest.tagline }}"{% endif %}>{{ latest.title }}</a>
+      {%- if latest.excerpt -%}<p class="excerpt">{{ latest.excerpt | strip_newlines | truncate: 120 }}</p>{%- endif -%}
+      <div class="card-footer"><a href="/essays.html">所有随笔 →</a></div>
+    </div>
+  {%- endif -%}
+
   </section>
 
   <section class="section-recent">

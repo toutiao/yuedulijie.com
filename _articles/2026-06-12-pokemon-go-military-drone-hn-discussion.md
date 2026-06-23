@@ -3,6 +3,8 @@ layout: post
 title: "Pokémon Go 数据训练军用无人机 — HN 讨论提炼"
 date: 2026-06-12
 categories: [articles]
+excerpt: "Pokémon Go 玩家数据被用于训练军用无人机？技术专家认为标题夸张，但数据伦理的原则之争让 HN 社区分裂。"
+tagline: "你抓精灵的时候，Niantic 在帮你参军。"
 ---
 
 ## 原文概要

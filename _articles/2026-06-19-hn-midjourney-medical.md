@@ -3,6 +3,8 @@ layout: post
 title: "Midjourney Medical — HN 讨论摘要"
 date: 2026-06-19
 categories: [articles]
+excerpt: "Midjourney 宣布进入医疗影像——超声波水缸全身扫描。放射科医生在 HN 上逐条驳斥了它的技术可行性。"
+tagline: "花 3500 美元做水缸体检，但别指望它能查出肺癌。"
 ---
 
 ## 原文概要

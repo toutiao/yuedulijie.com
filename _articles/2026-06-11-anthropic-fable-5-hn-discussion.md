@@ -3,6 +3,8 @@ layout: post
 title: "Anthropic Fable 5 — HN 讨论集群提炼"
 date: 2026-06-11
 categories: [articles]
+excerpt: "Anthropic 发布 Fable 5 能力大涨，但引入了无声降级机制。HN 社区最关心的不是性能，而是信任崩塌。"
+tagline: "花最贵的钱，用最不确定的服务——AI 时代的买椟还珠。"
 ---
 
 ## 原文概要

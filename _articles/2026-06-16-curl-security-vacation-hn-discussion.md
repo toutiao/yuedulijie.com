@@ -3,6 +3,8 @@ layout: post
 title: "Curl 七月不受理安全漏洞 — HN 讨论提炼"
 date: 2026-06-16
 categories: [articles]
+excerpt: "Curl 维护者宣布七月不受理安全漏洞——他要休假。HN 社区热议开源单点依赖和 LLM 如何加剧了维护者负担。"
+tagline: "curl 维护者：黑客不休息？那我先休了。"
 ---
 
 ## 原文概要

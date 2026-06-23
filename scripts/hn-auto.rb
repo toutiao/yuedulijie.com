@@ -277,6 +277,8 @@ layout: post
 title: "{原文标题} — HN 讨论摘要"
 date: {当前日期}
 categories: [articles]
+excerpt: "[一句话摘要]"
+tagline: "[浮夸版，不对外展示]"
 ---
 
 ### 章节顺序
@@ -308,6 +310,27 @@ categories: [articles]
 - 每段不超过 5 行
 - 每篇文章独立可读，不依赖本系列其他文章，不提及"前文""上篇""本系列"
 - 讨论段：一句话点明引文的洞察或指向的问题。想不到就不写，宁可没有也不要强行深刻
+
+### excerpt 字段要求
+- excerpt 写在 front matter 中，一句话概括文章核心（1-2 句，~80 字）
+- 短文（<3000 字）：精悍，点明核心洞察
+- 长文（>=3000 字）：钩子，挑最有趣/最反直觉的角度
+- 不浮夸，不用"震惊""惊人""万万没想到"
+- 电影/书籍类：不剧透，含剧透须在开头标注「⚠ 含剧透」
+
+### tagline 字段要求
+- tagline 写在 front matter 中，风格浮夸、轻松、卖焦虑、发散，不设限
+- 必须有原文事实作为锚点（文章的事件/观点），不能凭空编造
+- 不对外展示，通过 `<a title="...">` 被搜索引擎索引
+- 电影/书籍类：不剧透，含剧透须在开头标注「⚠ 含剧透」
+- 风格参考：
+  | 类别 | 特点 | 示例 |
+  | 吐槽/调侃 | 轻松拆台式幽默 | curl 维护者：黑客不休息？那我先休了。 |
+  | 卖焦虑/FOMO | 制造紧迫感 | Anthropic 的护城河正在蒸发，速度比你想象的要快。 |
+  | 金句/格言体 | 短促有力 | 救火的被奖励，防火的被遗忘。这是组织的终极真相。 |
+  | 直击本质 | 一句话戳穿 | 你只是想写个代码，Anthropic 却要你的护照照片。 |
+  | 反讽/黑色幽默 | 冷嘲热讽 | 花最贵的钱，用最不确定的服务——AI 时代的买椟还珠。 |
+  | 脑洞/发散 | 跨域类比 | 你抓精灵的时候，Niantic 在帮你参军。 |
 
 ### 其他
 - 简体中文
@@ -461,6 +484,32 @@ def slugify(title)
   keywords.join('-').empty? ? 'hn-discussion' : keywords.join('-')
 end
 
+def fallback_excerpt(text)
+  body = text.sub(/\A---.*?---\n*/m, '')
+    .gsub(/^#+ .*$/, '')
+    .gsub(/`([^`]+)`/, '\1')
+    .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
+    .strip.gsub(/\s+/, ' ')
+  excerpt = body[0, 120]
+  if body.length > 120
+    excerpt = excerpt.gsub(/[^。！？.!?\n]*$/, '') + '…'
+  end
+  excerpt.strip
+end
+
+def ensure_frontmatter_fields(text)
+  result = text
+  unless result =~ /^excerpt: /
+    excerpt = fallback_excerpt(result)
+    result = result.sub(/^categories:.*$/) { |m| "#{m}\nexcerpt: \"#{excerpt}\"" }
+  end
+  unless result =~ /^tagline: /
+    tagline = result[/^excerpt: "([^"]+)"/, 1] || ''
+    result = result.sub(/^(excerpt:.*)$/) { |m| "#{m}\ntagline: \"#{tagline}\"" }
+  end
+  result
+end
+
 def write_article(text, story_title, article_date, hn_url)
   today_str = article_date.strftime('%Y-%m-%d')
   filename = "#{today_str}-hn-#{slugify(story_title)}.md"
@@ -481,6 +530,8 @@ def write_article(text, story_title, article_date, hn_url)
     FM
     text = front_matter + text
   end
+
+  text = ensure_frontmatter_fields(text)
 
   File.write(filepath, text)
   puts "  -> #{filepath}"

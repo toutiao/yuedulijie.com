@@ -3,6 +3,8 @@ layout: post
 title: "如何赚十亿美元 — HN 讨论提炼"
 date: 2026-06-15
 categories: [articles]
+excerpt: "Paul Graham 说赚十亿只需要增长率和持续时间。HN 社区 1640 条评论反驳：从 200 万开始的门槛才是真正的特权。"
+tagline: "0.46% 的成功率，在这篇文章里变成了励志故事。"
 ---
 
 ## 原文概要

@@ -3,6 +3,8 @@ layout: post
 title: "本地模型替代 Claude — HN 讨论提炼"
 date: 2026-06-16
 categories: [articles]
+excerpt: "351 条评论告诉你本地模型替代 Claude 是否可行。主推 Qwen 3.6 + Pi 组合，前提是硬件够好。"
+tagline: "最好的本地模型约等于八个月前的云模型。免费的。"
 ---
 
 ## 原文概要

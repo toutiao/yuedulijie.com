@@ -3,6 +3,8 @@ layout: post
 title: "本地模型已可用于日常编码 — HN 讨论摘要"
 date: 2026-06-17
 categories: [articles]
+excerpt: "本地模型已接近前沿模型 75% 的编码能力。HN 社区分享了 Qwen 3.6 + Pi + llama.cpp 的最佳实践配置。"
+tagline: "单张 3090 跑出 $200/月的效果，还要什么自行车。"
 ---
 
 Vicki Boykis 在博客中分享了她使用本地模型进行日常编码的经验。相关讨论在 HN 上引发了社区对本地 vs 云端模型的热烈辩论。

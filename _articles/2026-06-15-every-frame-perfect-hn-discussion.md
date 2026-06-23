@@ -3,6 +3,8 @@ layout: post
 title: "每帧完美 — HN 讨论提炼"
 date: 2026-06-15
 categories: [articles]
+excerpt: "动画的每一帧都该经得起静态审视？HN 从 UI 动画聊到运动模糊、smear frame 和工具不该有动画的深层争论。"
+tagline: "你的 macOS 动画越来越卡？不是错觉——是 SwiftUI 的问题。"
 ---
 
 ## 原文概要

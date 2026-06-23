@@ -3,6 +3,8 @@ layout: post
 title: "CSSQuake — HN 讨论摘要"
 date: 2024-07-29
 categories: [articles]
+excerpt: "纯 CSS 实现的 3D 游戏渲染器。HN 社区对现代 CSS 的能力边界感到惊叹。"
+tagline: "纯 CSS 实现 Quake——浏览器比你想象的更可怕。"
 ---
 
 ## 原文概要

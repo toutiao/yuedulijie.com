@@ -3,6 +3,8 @@ layout: post
 title: "UHF X11: X11 Built for VisionOS and Apple Vision Pro — HN 讨论摘要"
 date: 2026-06-22
 categories: [articles]
+excerpt: "有人在 Apple Vision Pro 上跑起了 X11。HN 讨论从技术实现延伸到 Vision Pro 的实用性争议和开放替代方案的期待。"
+tagline: "在 3500 美元的头显里跑三十年前的 Linux 窗口系统——极客的浪漫。"
 ---
 
 ## 原文概要

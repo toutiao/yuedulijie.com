@@ -3,6 +3,8 @@ layout: post
 title: "Apache Burr — HN 讨论提炼"
 date: 2026-06-11
 categories: [articles]
+excerpt: "一个基于状态机的 AI agent 编排框架。HN 社区没有讨论 Burr 本身，而是争论要不要 agent 框架这个元问题。"
+tagline: "Agent 框架的正确用法：让可观测性替你省下 debug 的时间。"
 ---
 
 ## 原文概要

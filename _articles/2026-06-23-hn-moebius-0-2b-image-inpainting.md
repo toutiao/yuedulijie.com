@@ -3,6 +3,8 @@ layout: post
 title: "Moebius: 0.2B 图像修复模型实现 10B 级性能 — HN 讨论摘要"
 date: 2026-06-23
 categories: [articles]
+excerpt: "仅 0.2B 参数的图像修复模型实现了 10B 级性能。HN 社区对模型效率突破和设备端 AI 的应用前景感到兴奋。"
+tagline: "0.2B 干翻 10B，大模型信徒集体破防。"
 ---
 
 ## 原文概要

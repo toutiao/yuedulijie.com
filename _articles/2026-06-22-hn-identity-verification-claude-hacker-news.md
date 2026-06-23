@@ -3,6 +3,8 @@ layout: post
 title: "Claude 身份验证 — HN 讨论摘要"
 date: 2026-06-22
 categories: [articles]
+excerpt: "Anthropic 要求用户身份验证才能访问前沿模型。HN 社区认为美国出口限制正在推动全球用户转向非美替代方案。"
+tagline: "你只是想写个代码，Anthropic 却要你的护照照片。"
 ---
 
 ## 原文概要

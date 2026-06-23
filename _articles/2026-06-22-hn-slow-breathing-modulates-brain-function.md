@@ -3,6 +3,8 @@ layout: post
 title: "Slow breathing modulates brain function and risk behavior | Hacker News — HN 讨论摘要"
 date: 2026-06-22
 categories: [articles]
+excerpt: "每天几分钟慢速呼吸就能改变你的决策方式。HN 社区分享了呼吸练习改善专注力和减轻焦虑的实际经验。"
+tagline: "每天 5 分钟深呼吸就能改变大脑——还需要什么脑机接口？"
 ---
 
 Hacker News 社区近期对一篇关于慢速呼吸如何调节大脑功能和风险行为的研究进行了深入讨论。该研究探讨了通过控制呼吸频率来影响神经活动，进而改变认知过程和决策模式的机制。社区成员对慢速呼吸的科学原理、实际益处、历史背景以及个人体验表现出浓厚兴趣。
