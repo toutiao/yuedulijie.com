@@ -61,8 +61,18 @@ Build env: `JEKYLL_ENV=production` (build), `development` (serve). Persisted gem
 ## Commit Style
 Conventional commits in Chinese: `feat:`, `fix:`, `style:`, `docs:`, `refactor:` prefixes. Always build first. `make deploy msg='...'` does build → `git add -A` → commit → push in one step.
 
-## External API Restrictions (Hard)
-HN data via **`webfetch` ONLY**. Banned forever: `firebaseio.com/v0/`, `hn.algolia.com`.
+## Dev Environment Rules (Hard)
+
+**Never modify** git/SSh/GitHub CLI configuration when git operations fail. Report the error instead.
+
+- `git config --global`, `git config --system`: **denied** — modifying global/user-level git settings is forbidden
+- `git remote set-url`, `git remote add`, `git remote remove`: **denied** — the remote URL is pre-configured and coordinated with SSH/gh CLI
+- `gh auth`: **denied** — GitHub CLI authentication is pre-configured
+- `~/.ssh/config`: **do not edit** — SSH configuration is pre-configured
+- `~/.gitconfig`: **do not edit** — global git config is pre-configured
+- The local git, GitHub CLI, and SSH configs work together for normal `fetch`/`push`/`clone`. Do not assume they need fixing when a specific operation fails (e.g., timeout, auth error).
+
+If a git operation fails with an auth or network error, report the error message to the user and stop. Do not try to "fix" the environment.
 
 ## Plugin
 Only `jekyll-seo-tag`. HTML compression via `compress_html` in `_config.yml` (production only).
