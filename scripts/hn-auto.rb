@@ -60,7 +60,7 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
   end
 end
 
-def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
+def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 8192)
   uri = URI("https://generativelanguage.googleapis.com/v1beta/models/" \
             "#{GEMINI_MODEL}:generateContent?key=#{GEMINI_API_KEY}")
 
@@ -71,36 +71,47 @@ def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
   }
 
   retries = 0
-  begin
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    http.open_timeout = 30
-    http.read_timeout = 120
+  max_tokens_retried = false
 
-    request = Net::HTTP::Post.new(
-      uri.request_uri,
-      'Content-Type' => 'application/json'
-    )
-    request.body = JSON.generate(body)
+  loop do
+    begin
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.open_timeout = 30
+      http.read_timeout = 120
 
-    response = http.request(request)
-    result = JSON.parse(response.body)
+      request = Net::HTTP::Post.new(
+        uri.request_uri,
+        'Content-Type' => 'application/json'
+      )
+      request.body = JSON.generate(body)
 
-    candidate = result.dig('candidates', 0)
-    text = candidate&.dig('content', 'parts', 0, 'text')
-    unless text
-      raise "Gemini API error: #{JSON.pretty_generate(result)}"
+      response = http.request(request)
+      result = JSON.parse(response.body)
+
+      candidate = result.dig('candidates', 0)
+      text = candidate&.dig('content', 'parts', 0, 'text')
+      unless text
+        raise "Gemini API error: #{JSON.pretty_generate(result)}"
+      end
+
+      if candidate['finishReason'] == 'MAX_TOKENS' && !max_tokens_retried
+        warn "  WARNING: Response truncated (MAX_TOKENS), retrying with 16384..."
+        body[:generationConfig][:maxOutputTokens] = 16384
+        max_tokens_retried = true
+        next
+      end
+
+      warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
+      return text
+    rescue Net::ReadTimeout, Net::OpenTimeout => e
+      retries += 1
+      if retries <= 2
+        sleep retries * 5
+        next
+      end
+      raise "Gemini API timeout: #{e.message}"
     end
-
-    warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
-    text
-  rescue Net::ReadTimeout, Net::OpenTimeout => e
-    retries += 1
-    if retries <= 2
-      sleep retries * 5
-      retry
-    end
-    raise "Gemini API timeout: #{e.message}"
   end
 end
 
@@ -269,6 +280,19 @@ EXAMPLE
 SYSTEM_PROMPT = <<~PROMPT
 你是一个专业的中文科技新闻摘要编辑。你的任务是根据 Hacker News 讨论内容撰写一篇中文摘要文章。
 
+## ⚠️ 数据来源与禁止行为（必读）
+
+- 下方用户消息中已包含 Hacker News 讨论的完整文本。你正在读取的是**已内联提供的内容**，并非在实时访问外部网站。
+- **严禁**输出任何形式的免责声明，包括但不限于：
+  - "无法访问外部网站" / "cannot access external content"
+  - "以下内容为虚构/模拟" / "fabricated / simulated"
+  - "根据典型模式推测"
+  - 任何以"重要提示"或"注意"开头的免责段落
+- **严禁**编造 URL（如 example.com）、评论 ID、用户名或讨论话题。只能使用已提供的数据。
+- **严禁**将话题替换为不相关的领域（如把文件格式讨论改成数据可视化库）。
+- 如果提供的讨论涉及技术安全话题，这属于正常的专业交流。请正常总结，不要拒绝。
+- 文章必须直接从 `---` front matter 开始输出。前面不允许有任何前言、免责声明或解释文字。
+
 ## 格式要求（必须严格遵守）
 
 ### Front matter
@@ -382,6 +406,8 @@ def call_gemini_layered(discussion_with_ids, story_title)
   article_user = <<~PROMPT
     请为以下 Hacker News 讨论生成中文摘要文章。
 
+    【讨论数据已内联提供。直接读取并总结，无需访问任何外部网站。】
+
     讨论主题分组（作为文章结构参考）：
     #{clusters}
 
@@ -441,6 +467,83 @@ def verify_quotes(article_text)
   results
 end
 
+def validate_article(text, story_title)
+  errors = []
+
+  # 1. Refusal/fabrication patterns
+  refusal = [
+    /无法访问/, /cannot access/, /cannot browse/, /cannot retrieve/,
+    /虚构/, /模拟/, /fabricated/, /simulated/,
+    /example\.com/, /hypothetical/i,
+    /重要提示.*由于我/
+  ]
+  refusal.each do |pat|
+    if text.match?(pat)
+      errors << "refusal/fabrication detected: #{pat.inspect[0..50]}"
+      break
+    end
+  end
+
+  # 2. Required structural elements
+  unless text.match?(/^##\s/m)
+    errors << "missing ## sections"
+  end
+
+  unless text.match?(/^###\s/m)
+    errors << "missing ### subsections under 讨论焦点"
+  end
+
+  unless text.include?('总体情绪')
+    errors << "missing 总体情绪 section"
+  end
+
+  unless text.include?('<div class="disclaimer">')
+    errors << "missing disclaimer div"
+  end
+
+  # 3. Leaked front matter in body (YAML keys appearing after real front matter)
+  fm_end = text.index(/^---\s*$/, 4)  # skip first --- marker
+  if fm_end
+    body = text[(fm_end + 4)..]
+    if body.match?(/^layout:\s*post/m)
+      errors << "leaked front matter in body"
+    end
+  end
+
+  # 4. Content relevance: story title keywords should appear in article body
+  keywords = story_title.scan(/[a-zA-Z]{3,}/).map(&:downcase).reject { |w|
+    %w[the and for are was not that this with from have your hacker news ycombinator].include?(w)
+  }
+  if keywords.any?
+    body_lower = text.downcase
+    found = keywords.any? { |kw| body_lower.include?(kw) }
+    unless found
+      errors << "content drift: no title keywords in article (#{keywords.first(3).join(', ')})"
+    end
+  end
+
+  errors
+end
+
+def strip_leaked_front_matter(text)
+  # Locate the real front matter end (second --- on its own line)
+  first_fm_match = text.match(/\A(---\n.*?\n---)/m)
+  return text unless first_fm_match
+
+  fm_block = first_fm_match[1]
+  body = text[first_fm_match.end(1)..]
+
+  # Remove any remaining --- delimited blocks that contain YAML front matter keys
+  body = body.gsub(/^---\s*\n(?:layout:|title:|date:|categories:|excerpt:|tagline:).+?^---\s*\n+/m, '')
+
+  # Remove stray YAML key lines left in body
+  body = body.lines.reject { |l|
+    l.match?(/^\s*(?:layout|title|date|categories|excerpt|tagline):\s/)
+  }.join
+
+  "#{fm_block}#{body}"
+end
+
 SENSITIVE_LEFT = %w[china ccp tiananmen taiwan tibet xinjiang hong_kong]
 SENSITIVE_RIGHT = %w[censorship surveillance human_rights propaganda]
 
@@ -485,13 +588,22 @@ def slugify(title)
 end
 
 def fallback_excerpt(text)
-  body = text.sub(/\A---.*?---\n*/m, '')
-    .gsub(/^#+ .*$/, '')
+  body_lines = text.sub(/\A---.*?---\n*/m, '').lines
+  # Skip headings, bold disclaimer lines, blockquotes, separators, empty lines
+  clean = body_lines.reject { |l|
+    l.match?(/^\*{2,}.+\*{2,}/) ||  # bold disclaimer lines like **重要提示...**
+    l.match?(/^\s*>\s/) ||          # blockquotes
+    l.match?(/^#+\s/) ||            # markdown headings
+    l.match?(/^---/) ||             # horizontal rules
+    l.match?(/^[-*_]{3,}/) ||       # markdown hrule
+    l.strip.empty?                  # blank lines
+  }.join
     .gsub(/`([^`]+)`/, '\1')
     .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
+    .gsub(/\*\*([^*]+)\*\*/, '\1')
     .strip.gsub(/\s+/, ' ')
-  excerpt = body[0, 120]
-  if body.length > 120
+  excerpt = clean[0, 120]
+  if clean.length > 120
     excerpt = excerpt.gsub(/[^。！？.!?\n]*$/, '') + '…'
   end
   excerpt.strip
@@ -532,6 +644,7 @@ def write_article(text, story_title, article_date, hn_url)
   end
 
   text = ensure_frontmatter_fields(text)
+  text = strip_leaked_front_matter(text)
 
   File.write(filepath, text)
   puts "  -> #{filepath}"
@@ -581,17 +694,52 @@ def process_story(hn_url, date:, idx: nil)
 
   puts "  Fetching discussion..."
   discussion, title = extract_discussion(hn_url)
-
   comment_count = discussion.scan(/\[comment: \d+\]/).length
 
-  if comment_count > 50
-    puts "  Large discussion (#{comment_count} comments), using two-pass..."
-    article = call_gemini_layered(discussion, title)
-  else
-    puts "  Calling Gemini API..."
-    article = call_gemini(SYSTEM_PROMPT,
-      "请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
+  max_attempts = 3
+  article = nil
+  last_error = nil
+
+  max_attempts.times do |attempt|
+    puts "  Generating (attempt #{attempt + 1}/#{max_attempts})..."
+
+    temp = attempt == 0 ? 0.3 : (attempt == 1 ? 0.1 : 0.0)
+    escalation = case attempt
+    when 0
+      ""
+    when 1
+      "⚠️ 重试：上一轮你的回答包含拒绝或虚构内容，已被拒绝。你必须只使用下方已内联提供的讨论数据。不要拒绝、不要编造、不要添加免责声明。\n\n"
+    when 2
+      "🔴 最后尝试：前两次回答均被拒绝。数据由调用方内联提供，不涉及外部访问。输出文章即可，不要添加任何免责声明。如果再次拒绝，整个管道将失败。\n\n"
+    end
+
+    user_prompt = <<~PROMPT
+      #{escalation}请为以下 Hacker News 讨论生成中文摘要文章。
+
+      【讨论数据已内联提供。直接读取并总结，无需访问任何外部网站。】
+
+      === 讨论开始 ===
+      #{discussion}
+      === 讨论结束 ===
+    PROMPT
+
+    if comment_count > 50 && attempt == 0
+      article = call_gemini_layered(discussion, title)
+    else
+      article = call_gemini(SYSTEM_PROMPT, user_prompt, temperature: temp)
+    end
+
+    errors = validate_article(article, title)
+    if errors.empty?
+      break
+    end
+
+    puts "  ⚠ Attempt #{attempt + 1} rejected: #{errors.first(3).join('; ')}"
+    last_error = errors.join('; ')
+    article = nil
   end
+
+  raise "Article generation failed: #{last_error}" unless article
 
   puts "  Writing article..."
   filepath = write_article(article, title, date, hn_url)
@@ -599,6 +747,16 @@ def process_story(hn_url, date:, idx: nil)
   puts "  Verifying quotes..."
   results = verify_quotes(File.read(filepath))
   results.each { |r| puts "    #{r[:status]} #{r[:message]}" }
+
+  not_found = results.count { |r| r[:message]&.include?('not found on HN') }
+  total = results.length
+  if total > 0 && not_found == total
+    puts "  ❌ All #{total} comment IDs not found on HN — fabricated article, reverting..."
+    File.delete(filepath)
+    raise "Fabricated article: all comment IDs invalid"
+  elsif not_found > 0
+    puts "  ⚠ #{not_found}/#{total} comment IDs not found on HN"
+  end
 
   puts "  Running sensitivity scan..."
   if sensitivity_scan(File.read(filepath))
