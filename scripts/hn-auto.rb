@@ -23,7 +23,7 @@ GEMINI_API_KEY = ENV['GEMINI_API_KEY']
 HN_BEST_URL = 'https://news.ycombinator.com/best'
 ARTICLES_DIR = '_articles'
 SCORE_THRESHOLD = 80
-MAX_ARTICLES = 2
+MAX_ARTICLES = 1
 GEMINI_MODEL = 'gemini-2.5-flash'
 
 LOCAL_MODE = ARGV.any? { |a| a.match?(/\Ahttps?:\/\//) }
@@ -403,10 +403,15 @@ def call_gemini_layered(discussion_with_ids, story_title)
 
   # Pass 2: Article with cluster guidance
   puts "  Pass 2: Generating article..."
+  all_valid_ids = discussion_with_ids.scan(/\[comment:\s*(\d+)\]/).flatten
+
   article_user = <<~PROMPT
     请为以下 Hacker News 讨论生成中文摘要文章。
 
     【讨论数据已内联提供。直接读取并总结，无需访问任何外部网站。】
+
+    ⚠️ 可用评论 ID 列表（只能引用这些 ID）：
+    #{all_valid_ids.join(', ')}
 
     讨论主题分组（作为文章结构参考）：
     #{clusters}
@@ -419,6 +424,10 @@ def call_gemini_layered(discussion_with_ids, story_title)
 end
 
 # ── Post-generation checks ────────────────────────────────────────
+
+def extract_comment_ids(text)
+  text.scan(/\[comment:\s*(\d+)\]/).flatten.to_set
+end
 
 def verify_quotes(article_text)
   results = []
@@ -467,7 +476,7 @@ def verify_quotes(article_text)
   results
 end
 
-def validate_article(text, story_title)
+def validate_article(text, story_title, valid_ids = nil)
   errors = []
 
   # 1. Refusal/fabrication patterns
@@ -519,6 +528,19 @@ def validate_article(text, story_title)
     found = keywords.any? { |kw| body_lower.include?(kw) }
     unless found
       errors << "content drift: no title keywords in article (#{keywords.first(3).join(', ')})"
+    end
+  end
+
+  # 5. Comment ID fabrication check
+  if valid_ids && !valid_ids.empty?
+    article_ids = text.scan(/\[comment:\s*(\d+)\]/).flatten
+    fabricated = article_ids.reject { |id| valid_ids.include?(id) }
+    if fabricated.length > 0
+      if fabricated.length == article_ids.length
+        errors << "all #{fabricated.length} comment IDs fabricated (none match discussion data)"
+      else
+        errors << "#{fabricated.length}/#{article_ids.length} comment IDs fabricated: #{fabricated.first(5).join(', ')}"
+      end
     end
   end
 
@@ -694,6 +716,7 @@ def process_story(hn_url, date:, idx: nil)
 
   puts "  Fetching discussion..."
   discussion, title = extract_discussion(hn_url)
+  valid_ids = extract_comment_ids(discussion)
   comment_count = discussion.scan(/\[comment: \d+\]/).length
 
   max_attempts = 3
@@ -708,9 +731,9 @@ def process_story(hn_url, date:, idx: nil)
     when 0
       ""
     when 1
-      "⚠️ 重试：上一轮你的回答包含拒绝或虚构内容，已被拒绝。你必须只使用下方已内联提供的讨论数据。不要拒绝、不要编造、不要添加免责声明。\n\n"
+      "⚠️ 重试：上一轮生成的文章中包含虚构的评论 ID（不在提供的讨论数据中）。你必须严格使用下方讨论数据中已有的 [comment: ID] 编号。禁止编造任何 ID。不要拒绝、不要添加免责声明。\n\n"
     when 2
-      "🔴 最后尝试：前两次回答均被拒绝。数据由调用方内联提供，不涉及外部访问。输出文章即可，不要添加任何免责声明。如果再次拒绝，整个管道将失败。\n\n"
+      "🔴 最后尝试：前两次回答均因虚构评论 ID 被拒绝。评论 ID 必须从 === 讨论开始 === 到 === 讨论结束 === 之间的原始数据中提取，不得生成任何新的 ID。如果再次失败，整个管道将失败。\n\n"
     end
 
     user_prompt = <<~PROMPT
@@ -729,7 +752,7 @@ def process_story(hn_url, date:, idx: nil)
       article = call_gemini(SYSTEM_PROMPT, user_prompt, temperature: temp)
     end
 
-    errors = validate_article(article, title)
+    errors = validate_article(article, title, valid_ids)
     if errors.empty?
       break
     end
