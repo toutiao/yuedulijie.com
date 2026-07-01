@@ -64,47 +64,56 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
   end
 end
 
-def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
+def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 8192)
   uri = URI("https://generativelanguage.googleapis.com/v1beta/models/" \
             "#{GEMINI_MODEL}:generateContent?key=#{GEMINI_API_KEY}")
 
-  body = {
+  base_body = {
     system_instruction: { parts: [{ text: system_prompt }] },
     contents: [{ parts: [{ text: user_prompt }] }],
     generationConfig: { temperature: temperature, maxOutputTokens: max_tokens }
   }
 
-  retries = 0
-  begin
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    http.open_timeout = 30
-    http.read_timeout = 120
+  net_retries = 0
+  loop do
+    begin
+      body = Marshal.load(Marshal.dump(base_body))
+      body[:generationConfig][:maxOutputTokens] = max_tokens
 
-    request = Net::HTTP::Post.new(
-      uri.request_uri,
-      'Content-Type' => 'application/json'
-    )
-    request.body = JSON.generate(body)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.open_timeout = 30
+      http.read_timeout = 120
 
-    response = http.request(request)
-    result = JSON.parse(response.body)
+      request = Net::HTTP::Post.new(
+        uri.request_uri,
+        'Content-Type' => 'application/json'
+      )
+      request.body = JSON.generate(body)
 
-    candidate = result.dig('candidates', 0)
-    text = candidate&.dig('content', 'parts', 0, 'text')
-    unless text
-      raise "Gemini API error: #{JSON.pretty_generate(result)}"
-    end
+      response = http.request(request)
+      result = JSON.parse(response.body)
 
-    warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
-    text
-  rescue Net::ReadTimeout, Net::OpenTimeout => e
-    retries += 1
-    if retries <= 2
-      sleep retries * 5
+      candidate = result.dig('candidates', 0)
+      text = candidate&.dig('content', 'parts', 0, 'text')
+      unless text
+        raise "Gemini API error: #{JSON.pretty_generate(result)}"
+      end
+
+      if candidate['finishReason'] == 'MAX_TOKENS' && max_tokens < 32768
+        max_tokens *= 2
+        warn "  WARNING: Response truncated, retrying with max_tokens=#{max_tokens}..."
+        next
+      end
+
+      warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
+      return text
+    rescue Net::ReadTimeout, Net::OpenTimeout => e
+      net_retries += 1
+      raise "Gemini API timeout: #{e.message}" if net_retries > 2
+      sleep 5
       retry
     end
-    raise "Gemini API timeout: #{e.message}"
   end
 end
 
