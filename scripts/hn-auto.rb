@@ -12,9 +12,11 @@
 require 'net/http'
 require 'uri'
 require 'json'
+require 'yaml'
 require 'nokogiri'
 require 'set'
 require 'date'
+require 'time'
 require 'fileutils'
 
 # ── Configuration ──────────────────────────────────────────────────
@@ -25,8 +27,10 @@ ARTICLES_DIR = '_articles'
 SCORE_THRESHOLD = 80
 MAX_ARTICLES = 2
 GEMINI_MODEL = 'gemini-2.5-flash'
+CACHE_DIR = '_data/hn'
 
 LOCAL_MODE = ARGV.any? { |a| a.match?(/\Ahttps?:\/\//) }
+FROM_CACHE = ARGV.include?('--from-cache')
 
 unless GEMINI_API_KEY
   warn "ERROR: GEMINI_API_KEY environment variable not set"
@@ -102,6 +106,71 @@ def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
     end
     raise "Gemini API timeout: #{e.message}"
   end
+end
+
+# ── Cache Helpers ──────────────────────────────────────────────────
+
+def find_post_cache_dir(post_id)
+  Dir.glob(File.join(CACHE_DIR, '*', 'W*', post_id, 'comments.yaml')).each do |f|
+    dir = File.dirname(f)
+    return dir if File.directory?(dir)
+  end
+  nil
+end
+
+def reconstruct_discussion_from_cache(dir)
+  comments_file = File.join(dir, 'comments.yaml')
+  post_file = File.join(dir, 'post.yaml')
+  return nil unless File.exist?(comments_file)
+
+  comments_data = YAML.safe_load_file(comments_file, permitted_classes: [Time])
+  post_data = File.exist?(post_file) ? YAML.safe_load_file(post_file, permitted_classes: [Time]) : nil
+
+  title = post_data ? post_data['title'] || 'HN Discussion' : 'HN Discussion'
+  hn_url = post_data ? post_data['hn_url'] || '' : ''
+
+  lines = ["Title: #{title}", "URL: #{hn_url}", ""]
+  (comments_data['comments'] || []).each do |c|
+    lines << "[comment: #{c['id']} | score: #{c['score']} | user: #{c['author']}]"
+    lines << (c['text'] || '')
+    lines << "---"
+  end
+
+  text = lines.join("\n")
+  text = text[0...80_000] + "\n\n[...truncated]" if text.length > 80_000
+  [text, title]
+end
+
+def load_article_from_cache(dir)
+  article_file = File.join(dir, 'article.yaml')
+  return nil unless File.exist?(article_file)
+
+  data = YAML.safe_load_file(article_file, permitted_classes: [Time])
+  return nil unless data && data['fetch_status'] == 'success'
+  data['content']
+end
+
+def load_stories_index
+  today = Date.today
+  prev = today - 7
+  [today, prev].each do |date|
+    yr = date.cwyear.to_s
+    wk = date.cweek.to_s.rjust(2, '0')
+    index_path = File.join(CACHE_DIR, yr, "W#{wk}", 'stories.yaml')
+    next unless File.exist?(index_path)
+
+    data = YAML.safe_load_file(index_path, permitted_classes: [Time])
+    stories = data['stories']
+    next unless stories.is_a?(Array) && !stories.empty?
+
+    return stories.map do |s|
+      {
+        id: s['id'], title: s['title'], url: s['url'],
+        hn_url: s['hn_url'], score: s['score']
+      }
+    end
+  end
+  nil
 end
 
 # ── HN Scraper ─────────────────────────────────────────────────────
@@ -343,7 +412,7 @@ PROMPT
 
 # ── Layered Generation (Phase C) ──────────────────────────────────
 
-def call_gemini_layered(discussion_with_ids, story_title)
+def call_gemini_layered(discussion_with_ids, story_title, article_prefix = "")
   # Pass 1: Theme clustering (compact, low temp)
   puts "  Pass 1: Theme clustering..."
   cluster_system = "你是一个讨论分析助手。将评论按主题分组，输出紧凑的分组结果。"
@@ -380,7 +449,7 @@ def call_gemini_layered(discussion_with_ids, story_title)
   # Pass 2: Article with cluster guidance
   puts "  Pass 2: Generating article..."
   article_user = <<~PROMPT
-    请为以下 Hacker News 讨论生成中文摘要文章。
+    #{article_prefix}请为以下 Hacker News 讨论生成中文摘要文章。
 
     讨论主题分组（作为文章结构参考）：
     #{clusters}
@@ -575,22 +644,48 @@ end
 
 # ── Main ───────────────────────────────────────────────────────────
 
-def process_story(hn_url, date:, idx: nil)
+def process_story(hn_url, date:, idx: nil, story: nil)
   prefix = idx ? "  Story #{idx}" : "  Story"
   puts "#{prefix}: #{hn_url}"
 
-  puts "  Fetching discussion..."
-  discussion, title = extract_discussion(hn_url)
+  post_id = story ? story[:id] : hn_url[/\d+/]
+  discussion = nil
+  title = nil
+  article_text = nil
+
+  cache_dir = post_id ? find_post_cache_dir(post_id) : nil
+
+  if cache_dir
+    puts "  Loading from cache: #{cache_dir}"
+    discussion, title = reconstruct_discussion_from_cache(cache_dir)
+    article_text = load_article_from_cache(cache_dir)
+    if article_text
+      puts "  Article text loaded: yes (#{article_text.length} chars)"
+    else
+      puts "  Article text loaded: no"
+    end
+  end
+
+  unless discussion
+    puts "  Cache miss, fetching live..."
+    discussion, title = extract_discussion(hn_url)
+  end
 
   comment_count = discussion.scan(/\[comment: \d+\]/).length
 
+  article_prefix = if article_text
+    "---原文内容（撰写「原文概要」时优先参考）---\n#{article_text}\n---原文结束---\n\n"
+  else
+    ""
+  end
+
   if comment_count > 50
     puts "  Large discussion (#{comment_count} comments), using two-pass..."
-    article = call_gemini_layered(discussion, title)
+    article = call_gemini_layered(discussion, title, article_prefix)
   else
     puts "  Calling Gemini API..."
     article = call_gemini(SYSTEM_PROMPT,
-      "请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
+      "#{article_prefix}请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
   end
 
   puts "  Writing article..."
@@ -613,9 +708,10 @@ end
 
 def run
   now = Time.now.utc
+  mode_str = LOCAL_MODE ? 'local' : (FROM_CACHE ? 'CI (from cache)' : 'CI (live)')
   puts "=" * 50
   puts "HN Auto-Summarizer"
-  puts "Mode: #{LOCAL_MODE ? 'local' : 'CI'}"
+  puts "Mode: #{mode_str}"
   puts "Date: #{now.strftime('%Y-%m-%d %H:%M UTC')}"
   puts "=" * 50
 
@@ -623,27 +719,33 @@ def run
     # ── Local mode: process provided URL ──
     url = ARGV.find { |a| a.match?(/\Ahttps?:\/\//) }
     puts "\n[1/1] Processing single URL..."
-    process_story(url, date: now)
+    post_id = url[/\d+/]
+    story = { id: post_id, hn_url: url, url: nil, score: 0, title: nil }
+    process_story(url, date: now, story: story)
     puts "\nDone! Article created in #{ARTICLES_DIR}/"
     return
   end
 
   # ── CI mode: fetch HN best → select → generate → build → push ──
 
-  # Step 1: Fetch HN best page
-  puts "\n[1/6] Fetching HN best page..."
-  best_html = fetch(HN_BEST_URL)
-
-  # Step 2: Parse stories
-  puts "[2/6] Parsing stories..."
-  stories = parse_stories(best_html)
-  puts "  Found #{stories.length} stories"
-  stories.sort_by { |s| -s[:score] }.first(10).each do |s|
-    puts "    [#{s[:score]}] #{s[:title][0..70]}"
+  if FROM_CACHE
+    puts "\n[1/5] Loading stories index from cache..."
+    stories = load_stories_index
+    if stories.nil? || stories.empty?
+      puts "  No cached stories found, fetching live..."
+      stories = fetch_live_stories
+    else
+      puts "  Loaded #{stories.length} stories from cache"
+      stories.sort_by { |s| -s[:score] }.first(10).each do |s|
+        puts "    [#{s[:score]}] #{s[:title][0..70]}"
+      end
+    end
+  else
+    stories = fetch_live_stories
   end
 
-  # Step 3: Select stories
-  puts "[3/6] Selecting stories..."
+  # Step 2: Select stories
+  puts "[2/5] Selecting stories..."
   existing = get_existing_keywords
   selected = select_stories(stories, existing)
   if selected.empty?
@@ -653,12 +755,12 @@ def run
   puts "  Selected #{selected.length} stories:"
   selected.each { |s| puts "    [#{s[:score]}] #{s[:title][0..70]}" }
 
-  # Step 4: Generate articles
-  puts "[4/6] Generating articles..."
+  # Step 3: Generate articles
+  puts "[3/5] Generating articles..."
   generated = []
   selected.each_with_index do |story, i|
     begin
-      path = process_story(story[:hn_url], date: now, idx: i + 1)
+      path = process_story(story[:hn_url], date: now, idx: i + 1, story: story)
       generated << path
     rescue => e
       puts "  ERROR on story #{i + 1}: #{e.message}"
@@ -670,21 +772,34 @@ def run
     return
   end
 
-  # Step 5: Build
-  puts "\n[5/6] Validating Jekyll build..."
-  unless run_build
-    puts "  Build failed, reverting..."
-    generated.each { |f| File.delete(f) if File.exist?(f) }
-    system("git checkout -- .")
-    exit 1
+  # Step 4: Build (skip in --from-cache mode, CI handles separately)
+  unless FROM_CACHE
+    puts "\n[4/5] Validating Jekyll build..."
+    unless run_build
+      puts "  Build failed, reverting..."
+      generated.each { |f| File.delete(f) if File.exist?(f) }
+      system("git checkout -- .")
+      exit 1
+    end
+
+    # Step 5: Commit & push
+    puts "[5/5] Committing and pushing..."
+    git_commit_push
   end
 
-  # Step 6: Commit & push
-  puts "[6/6] Committing and pushing..."
-  git_commit_push
-
-  puts "\nDone! Generated and published:"
+  puts "\nDone! Generated:"
   generated.each { |f| puts "   #{f}" }
+end
+
+def fetch_live_stories
+  puts "[1/5] Fetching HN best page..."
+  best_html = fetch(HN_BEST_URL)
+  stories = parse_stories(best_html)
+  puts "  Found #{stories.length} stories"
+  stories.sort_by { |s| -s[:score] }.first(10).each do |s|
+    puts "    [#{s[:score]}] #{s[:title][0..70]}"
+  end
+  stories
 end
 
 run

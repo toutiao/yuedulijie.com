@@ -251,6 +251,8 @@ GEM
     rb-fsevent (0.11.2)
     rb-inotify (0.11.1)
       ffi (~> 1.0)
+    reverse_markdown (2.1.1)
+      nokogiri
     rexml (3.4.4)
     rouge (3.30.0)
     rubyzip (2.4.1)
@@ -280,6 +282,7 @@ PLATFORMS
 
 DEPENDENCIES
   github-pages
+  reverse_markdown (~> 2.1)
 
 BUNDLED WITH
    2.6.9

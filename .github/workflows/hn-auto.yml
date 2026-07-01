@@ -32,7 +32,68 @@ jobs:
             "AUTHORIZATION: basic $(printf '%s:' "$PAT" | base64 -w0)"
           git remote set-url origin "https://github.com/${{ github.repository }}"
 
-      - name: Run HN Auto-Summarizer
+      - name: Set week keys
+        run: |
+          echo "WEEK_KEY=$(date -u +%Y-W%V)" >> $GITHUB_ENV
+          echo "PREV_WEEK_KEY=$(date -u -d '7 days ago' +%Y-W%V)" >> $GITHUB_ENV
+
+      - name: Restore current week cache
+        uses: actions/cache/restore@v4
+        with:
+          path: _data/hn/${{ env.WEEK_KEY }}
+          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.WEEK_KEY }}-
+
+      - name: Restore previous week cache
+        uses: actions/cache/restore@v4
+        with:
+          path: _data/hn/${{ env.PREV_WEEK_KEY }}
+          key: hn-data-${{ env.PREV_WEEK_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.PREV_WEEK_KEY }}-
+
+      - name: Fetch HN data
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: bundle exec ruby scripts/hn-auto.rb
+        run: bundle exec ruby scripts/hn-fetch.rb --best
+
+      - name: Generate articles
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: bundle exec ruby scripts/hn-auto.rb --from-cache
+
+      - name: Build Jekyll
+        id: jekyll_build
+        run: bundle exec jekyll build
+        continue-on-error: true
+
+      - name: Revert on build failure
+        if: steps.jekyll_build.outcome == 'failure'
+        run: |
+          git checkout -- _articles/
+          echo "Build FAILED, reverted article changes"
+          exit 1
+
+      - name: Commit and push articles
+        if: steps.jekyll_build.outcome == 'success'
+        run: |
+          STATUS=$(git status --porcelain _articles/)
+          if [ -z "$STATUS" ]; then
+            echo "No new articles to commit"
+            exit 0
+          fi
+          git add -A _articles/
+          git commit -m "feat: HN 自动摘要 $(date -u +%Y-%m-%d)"
+          git push origin HEAD || (
+            git pull --rebase origin HEAD && git push origin HEAD
+          )
+          echo "Push OK"
+
+      - name: Save current week cache
+        # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
+        # 如果实测发现上周 entry 提前过期（<7天），原因是 restore 不计为
+        # activity。解决：给上周也加 cache/save（相同 key 覆盖，刷新活动
+        # 时间戳）。当前标注「只读」是预期行为，先不加 save。
+        uses: actions/cache/save@v4
+        with:
+          path: _data/hn/${{ env.WEEK_KEY }}
+          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}

@@ -1,4 +1,4 @@
-.PHONY: build build-fast serve test deploy clean
+.PHONY: build build-fast serve test deploy clean fetch fetch-best
 
 build:
 	docker compose run --rm build
@@ -29,3 +29,10 @@ build-fast:
 	APT_MIRROR=mirrors.aliyun.com \
 	GEM_MIRROR=https://gems.ruby-china.com \
 	docker compose run --rm build
+
+fetch:
+	@[ -n "$(url)" ] || (echo "Usage: make fetch url='<hn_url>'" && exit 1)
+	docker compose run --rm build ruby scripts/hn-fetch.rb --url "$(url)"
+
+fetch-best:
+	docker compose run --rm build ruby scripts/hn-fetch.rb --best
