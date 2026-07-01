@@ -25,7 +25,7 @@ GEMINI_API_KEY = ENV['GEMINI_API_KEY']
 HN_BEST_URL = 'https://news.ycombinator.com/best'
 ARTICLES_DIR = '_articles'
 SCORE_THRESHOLD = 80
-MAX_ARTICLES = 2
+MAX_ARTICLES = 1
 GEMINI_MODEL = 'gemini-2.5-flash'
 CACHE_DIR = '_data/hn'
 
