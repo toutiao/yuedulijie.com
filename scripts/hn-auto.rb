@@ -675,14 +675,14 @@ def process_story(hn_url, date:, idx: nil, story: nil)
     discussion, title = extract_discussion(hn_url)
   end
 
-  comment_count = discussion.scan(/\[comment: \d+\]/).length
+  comment_count = discussion.scan(/\[comment:\s*\d+/).length
 
   if comment_count == 0
     puts "  ⚠ No comments found, skipping (no discussion data for Gemini)"
     return nil
   end
 
-  scraped_ids = discussion.scan(/\[comment:\s*(\d+)\]/).flatten
+  scraped_ids = discussion.scan(/\[comment:\s*(\d+)/).flatten
 
   article_prefix = if article_text
     "---原文内容（撰写「原文概要」时优先参考）---\n#{article_text}\n---原文结束---\n\n"
