@@ -228,7 +228,7 @@ def extract_discussion(hn_url)
   text = lines.join("\n")
   text = text[0...80_000] + "\n\n[...truncated]" if text.length > 80_000
 
-  [text, story_title]
+  [text, story_title, active]
 end
 
 # ── Article Generator ──────────────────────────────────────────────
@@ -292,6 +292,7 @@ SYSTEM_PROMPT = <<~PROMPT
 - **严禁**将话题替换为不相关的领域（如把文件格式讨论改成数据可视化库）。
 - 如果提供的讨论涉及技术安全话题，这属于正常的专业交流。请正常总结，不要拒绝。
 - 文章必须直接从 `---` front matter 开始输出。前面不允许有任何前言、免责声明或解释文字。
+- **必须**从讨论数据中提取真实评论填入文章。"典型观点一览"表格至少包含 4 条真实引用。"讨论焦点"段落必须引用真实评论并使用 [comment: ID] 格式。
 
 ## 格式要求（必须严格遵守）
 
@@ -425,10 +426,6 @@ end
 
 # ── Post-generation checks ────────────────────────────────────────
 
-def extract_comment_ids(text)
-  text.scan(/\[comment:\s*(\d+)\]/).flatten.to_set
-end
-
 def verify_quotes(article_text)
   results = []
   article_text.scan(/\[comment:\s*(\d+)\]/).flatten.uniq.each do |cid|
@@ -476,6 +473,39 @@ def verify_quotes(article_text)
   results
 end
 
+def verify_quotes_inline(article_text, comments)
+  by_id = comments.each_with_object({}) { |c, h| h[c[:id]] = c }
+  errors = []
+  article_text.scan(/\[comment:\s*(\d+)\]/).flatten.uniq.each do |cid|
+    line = article_text.lines.find { |l| l.include?("[comment: #{cid}]") }
+    next unless line
+
+    quoted = line[/"([^"]*)"/, 1] || ''
+    article_user = line[/—\s*(\S+)/, 1] || ''
+
+    orig = by_id[cid]
+    unless orig
+      errors << "comment #{cid}: ID not in discussion data"
+      next
+    end
+
+    norm_q = quoted.gsub(/\s+/, ' ')
+    norm_o = orig[:text].gsub(/\s+/, ' ')
+    unless norm_o.include?(norm_q)
+      errors << "comment #{cid}: text mismatch (quoted '#{norm_q[0..80]}')"
+    end
+
+    unless article_user.downcase == orig[:user].downcase
+      errors << "comment #{cid}: user mismatch (article=#{article_user})"
+    end
+  end
+  errors
+end
+
+def extract_comment_ids(text)
+  text.scan(/\[comment:\s*(\d+)\]/).flatten.to_set
+end
+
 def validate_article(text, story_title, valid_ids = nil)
   errors = []
 
@@ -511,7 +541,7 @@ def validate_article(text, story_title, valid_ids = nil)
   end
 
   # 3. Leaked front matter in body (YAML keys appearing after real front matter)
-  fm_end = text.index(/^---\s*$/, 4)  # skip first --- marker
+  fm_end = text.index(/^---\s*$/, 4)
   if fm_end
     body = text[(fm_end + 4)..]
     if body.match?(/^layout:\s*post/m)
@@ -544,21 +574,41 @@ def validate_article(text, story_title, valid_ids = nil)
     end
   end
 
+  # 6. Content quality: 典型观点一览 table must have non-empty data rows
+  table_section = text[/## 典型观点一览.*?(?=\n## |\z)/m]
+  if table_section
+    rows = table_section.split("\n")
+    data_rows = rows.select { |r| r.match?(/^\|.+\|.+\|.+\|$/) }
+    # Exclude header row (立场|用户|一句话) and separator row (---|---|---)
+    content_rows = data_rows.reject { |r|
+      r.include?('立场') || r.match?(/\|[-:]+\|[-:]+\|[-:]+/)
+    }
+    filled_rows = content_rows.select { |r| r.match?(/^\|[^|]*[^|\s][^|]*\|\s*[^|\s]/) }
+    if filled_rows.length < 4
+      errors << "典型观点一览 table has < 4 data rows with content (#{filled_rows.length})"
+    end
+  else
+    errors << "missing 典型观点一览 table"
+  end
+
+  # 7. Content quality: article body must contain quote references
+  body = text.split(/^---\s*$/m, 3).last || text
+  quote_refs = body.scan(/\[comment:\s*(\d+)\]/).flatten
+  if quote_refs.length < 3
+    errors << "body contains < 3 [comment:] references (#{quote_refs.length})"
+  end
+
   errors
 end
 
 def strip_leaked_front_matter(text)
-  # Locate the real front matter end (second --- on its own line)
   first_fm_match = text.match(/\A(---\n.*?\n---)/m)
   return text unless first_fm_match
 
   fm_block = first_fm_match[1]
   body = text[first_fm_match.end(1)..]
 
-  # Remove any remaining --- delimited blocks that contain YAML front matter keys
   body = body.gsub(/^---\s*\n(?:layout:|title:|date:|categories:|excerpt:|tagline:).+?^---\s*\n+/m, '')
-
-  # Remove stray YAML key lines left in body
   body = body.lines.reject { |l|
     l.match?(/^\s*(?:layout|title|date|categories|excerpt|tagline):\s/)
   }.join
@@ -715,7 +765,7 @@ def process_story(hn_url, date:, idx: nil)
   puts "#{prefix}: #{hn_url}"
 
   puts "  Fetching discussion..."
-  discussion, title = extract_discussion(hn_url)
+  discussion, title, all_comments = extract_discussion(hn_url)
   valid_ids = extract_comment_ids(discussion)
   comment_count = discussion.scan(/\[comment: \d+\]/).length
 
@@ -727,13 +777,10 @@ def process_story(hn_url, date:, idx: nil)
     puts "  Generating (attempt #{attempt + 1}/#{max_attempts})..."
 
     temp = attempt == 0 ? 0.3 : (attempt == 1 ? 0.1 : 0.0)
-    escalation = case attempt
-    when 0
+    escalation = if attempt > 0
+      "⚠️ 重试 (attempt #{attempt + 1}/#{max_attempts})：上轮文章存在质量问题：#{last_error}。\n\n你必须从讨论数据中提取真实评论填入文章。'典型观点一览'表格必须包含至少 4 条非空引用行。'讨论焦点'段落必须使用 [comment: ID] 格式引用真实评论。禁止编造任何内容。\n\n"
+    else
       ""
-    when 1
-      "⚠️ 重试：上一轮生成的文章中包含虚构的评论 ID（不在提供的讨论数据中）。你必须严格使用下方讨论数据中已有的 [comment: ID] 编号。禁止编造任何 ID。不要拒绝、不要添加免责声明。\n\n"
-    when 2
-      "🔴 最后尝试：前两次回答均因虚构评论 ID 被拒绝。评论 ID 必须从 === 讨论开始 === 到 === 讨论结束 === 之间的原始数据中提取，不得生成任何新的 ID。如果再次失败，整个管道将失败。\n\n"
     end
 
     user_prompt = <<~PROMPT
@@ -753,6 +800,7 @@ def process_story(hn_url, date:, idx: nil)
     end
 
     errors = validate_article(article, title, valid_ids)
+    errors += verify_quotes_inline(article, all_comments) if errors.empty?
     if errors.empty?
       break
     end
