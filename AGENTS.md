@@ -74,5 +74,45 @@ Conventional commits in Chinese: `feat:`, `fix:`, `style:`, `docs:`, `refactor:`
 
 If a git operation fails with an auth or network error, report the error message to the user and stop. Do not try to "fix" the environment.
 
+## First Principles (Hard)
+
+Before any change to pipelines (scripts/hn-auto.rb, CI workflows, deployment), decompose the system to its irreducible components and validate each assumption:
+
+1. **State each atomic assumption** (e.g., "Gemini outputs [comment: ID] matching scraped data")
+2. **What violates it?** (e.g., "Gemini fabricates an ID, or real ID with rewritten text")
+3. **Which layer catches the violation?** (e.g., "validate_article check #5 catches fabricated IDs; verify_quotes_inline catches text/user mismatch")
+4. **If undetected, blast radius?** (e.g., "fabricated quote published as real HN comment")
+
+Template:
+```
+Assumption: ______
+Violated by: ______
+Caught by: ______
+Blast radius if missed: ______
+```
+
+Every assumption needs at least one catching layer. If any assumption has zero catching layers, the design is incomplete — do not proceed.
+
+## Adversarial Review Gate (Hard)
+
+Before committing any change to pipelines or automation, run adversarial review:
+
+1. **Attack the output**: Given the new code, what is the worst valid output it would accept?
+2. **Attack the threshold**: Can an adversary craft inputs that pass all checks but produce bad content?
+3. **Attack the failure mode**: When the system fails, does it fail safe (no output) or unsafe (bad output)?
+
+Output the review as:
+```
+Adversarial Review:
+  Attack 1: <scenario> → <outcome> → [BLOCKED / WARN / MISSED]
+  Attack 2: <scenario> → <outcome> → [BLOCKED / WARN / MISSED]
+  Risk accepted: <list of residual risks with justification>
+  Gate: [PASS / FAIL]
+```
+
+The gate passes only if:
+- No MISSED high-severity attacks remain
+- All residual risks documented with explicit acceptance rationale
+
 ## Plugin
 Only `jekyll-seo-tag`. HTML compression via `compress_html` in `_config.yml` (production only).
