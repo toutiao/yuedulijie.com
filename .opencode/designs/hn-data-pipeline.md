@@ -48,7 +48,7 @@ author: "username"
 posted_at: "2026-07-01T12:00:00Z"  # HN 原始发布时间
 fetched_at: "2026-07-01T14:00:00Z" # 最后一次抓取时间
 article_url: "https://..."         # 目标文章 URL（可为 null）
-article_fetch_status: "success"    # skipped | success | blocked | error
+article_fetch_status: "success"    # skipped | success | blocked | not_found | error
 ```
 
 #### HN 帖子类型与 url 行为
@@ -126,22 +126,22 @@ stories:
 
 ## 文章正文提取策略
 
-参考 opencode webfetch 工具设计（HTTP → HTML → Markdown），增加 Readability 层过滤：
+参考 opencode webfetch 工具设计（HTTP → HTML → Markdown），增加 nokogiri 语义标签过滤：
 
 ```
 HTTP GET (浏览器 UA, 5MB limit, 30s timeout)
-  → readability gem (Mozilla Readability — 提取主内容，去导航/广告)
+  → nokogiri 语义标签提取 (<article>/<main>/[role="main"])，去导航/广告
   → reverse_markdown gem (HTML → Markdown, 类 Turndown)
   → YAML content 字段
 ```
 
 **依赖：**
-- `readability` gem (Mozilla Readability ruby port)
+- `nokogiri`（通过 `github-pages` 内置，无需额外安装）
 - `reverse_markdown` gem (HTML → Markdown)
 
 **fallback 链：**
-1. `readability` 提取成功 → Markdown 正文
-2. `readability` 无结果 → 全页 HTML → `reverse_markdown` 转 Markdown
+1. 语义标签（`<article>` / `<main>` / `.post-content` 等）命中 → Markdown 正文
+2. 无命中标签 → 全页 `<body>` → `reverse_markdown` 转 Markdown
 3. HTTP 失败 / 404 — `fetch_status: "error"`，`content: null`
 
 ## Cache 策略
@@ -197,7 +197,7 @@ ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 
 ### 逻辑
 
-1. 计算目标周目录 `_data/hn/<WEEK_KEY>/`
+1. 计算目标周目录 `_data/hn/<CUR_PATH>/`
 2. `--best`: 抓 HN `/best` → 解析 30 stories → 写 `stories.yaml` → 对 score >= `SCORE_THRESHOLD` 的帖子完整抓取
 3. `--url`: 抓单篇 → 写 `post.yaml` + `comments.yaml` + `article.yaml`
 4. 缓存命中检查：`post.yaml` 存在且 `fetched_at` < 1h → 跳过
@@ -303,6 +303,8 @@ jobs:
         run: bundle exec ruby scripts/hn-fetch.rb --best
 
       - name: Generate articles
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: bundle exec ruby scripts/hn-auto.rb --from-cache
 
       - name: Build Jekyll
@@ -330,7 +332,6 @@ jobs:
         with:
           path: _data/hn/${{ env.CUR_PATH }}
           key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
-          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
 ```
 
 ## Makefile

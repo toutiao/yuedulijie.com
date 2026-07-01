@@ -54,8 +54,6 @@ jobs:
           restore-keys: hn-data-${{ env.PREV_KEY }}-
 
       - name: Fetch HN data
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: bundle exec ruby scripts/hn-fetch.rb --best
 
       - name: Generate articles

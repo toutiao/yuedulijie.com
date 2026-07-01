@@ -171,6 +171,9 @@ def load_stories_index
     end
   end
   nil
+rescue => e
+  warn "  [warn] stories.yaml parse error: #{e.message}"
+  nil
 end
 
 # ── HN Scraper ─────────────────────────────────────────────────────
