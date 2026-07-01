@@ -15,7 +15,7 @@ _layouts/         # Layouts: default, post, page, home, per-collection pages
 _movies/ (14)     # Movie reviews
 _books/ (0)       # Book reviews (empty)
 _essays/ (0)      # Essays (empty)
-_articles/ (13)   # HN discussion summary articles (populated Jun 2026)
+_articles/         # HN discussion summary articles (populated Jun 2026)
 _sass/            # SCSS source (empty — styles in assets/main.scss)
 assets/           # main.scss (entry, has front matter), main.js, favicon
 ```

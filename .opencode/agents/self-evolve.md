@@ -3,6 +3,10 @@ description: Reviews and improves agent configurations, skills, and workflows
 mode: subagent
 temperature: 0.4
 permission:
+  read: allow
+  glob: allow
+  grep: allow
+  edit: allow
   bash:
     "*": ask
     "ls *": allow

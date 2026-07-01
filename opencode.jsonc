@@ -106,7 +106,7 @@
         "edit": "allow",
         "bash": {
           "*": "ask",
-          "bundle exec *": "allow",
+          "docker compose *": "allow",
           "ls *": "allow"
         },
         "skill": "allow"

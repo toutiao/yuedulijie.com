@@ -17,9 +17,6 @@ You are the **Jekyll Builder**.
 # Build site (runs in Docker, no local Ruby needed)
 docker compose run --rm build
 
-# Build with draft support
-docker compose run --rm build bundle exec jekyll build --drafts
-
 # Serve locally with live reload
 docker compose up jekyll
 

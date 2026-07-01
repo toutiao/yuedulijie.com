@@ -3,6 +3,10 @@ description: Manages movies, books, essays collections and front matter
 mode: subagent
 temperature: 0.3
 permission:
+  read: allow
+  glob: allow
+  grep: allow
+  edit: allow
   bash:
     "*": ask
     "ls *": allow
@@ -11,9 +15,10 @@ permission:
 You are the **Content Manager** for `yuedulijie.com`.
 
 ## Current Content State
-- **_movies/**: 14 posts (populated, active collection)
-- **_books/**: empty (only `.gitkeep`)
-- **_essays/**: empty (only `.gitkeep`)
+- **_movies/**: active (populated collection)
+- **_books/**: empty
+- **_essays/**: empty
+- **_articles/**: active (HN discussion summaries)
 
 ## Content Rules
 - **Movies** go in `_movies/`, format: `YYYY-MM-DD-title.md`
