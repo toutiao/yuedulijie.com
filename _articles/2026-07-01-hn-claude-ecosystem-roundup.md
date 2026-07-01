@@ -41,6 +41,10 @@ tagline: "Anthropic 的一天：被扒皮、被评测、被松绑。Claude Code 
 
 > "Anthropic always came off to me as what can shorthand be described as an abusive controlling partner + the resulting relationship." — hypfer [thread 1]
 
+但也有用户持技术中立立场，认为这在互联网平台并不罕见：
+
+> "Almost all for-profit large internet platform providers you use have anti-bot, anti-scraping, anti-spam, anti-abuse defenses. This is a new thing that is the same, it's anti-distillation, but its a subset of the same space. [...] But what Anthropic is doing here is nothing new." — chradams [thread 1]
+
 技术上，社区普遍认为这种指纹识别技术本身并不复杂——毕竟只有时区和主机名两个 bit 的信息——但"今天藏两个 bit，明天藏多少？"的滑坡担忧很普遍。
 
 也有用户在讨论中提出了防御方案：可以构建能够持续分析闭源 SDK 二进制中隐写模式的工具链，但一位评论者悲观地表示，这类检测很容易被更新版绕过——守方必须次次成功，攻方只需一次。
@@ -75,7 +79,9 @@ Sonnet 5 带来了新的"effort"参数——用户可以控制模型推理深度
 
 该用户补充道，在计入每月每人约 2000 欧元的工具成本后，这个数字看起来更不乐观。这个内部数据与社区中大量"10 倍开发者"的个人证词形成了有趣的反差。
 
-### 出口管制与 AI 供应链
+### 出口管制与 AI 供应链 ⚑ sensitive
+
+> 本节涉及地缘政治议题中的争议性讨论，包括对中美科技竞争的不同立场评价，内容仅供信息参考。
 
 第三条新闻更像是前两条的背景板——美国商务部对 Fable 5 和 Mythos 5 解除了出口管制。此前这些模型一度被限制向海外用户提供。
 
@@ -111,7 +117,7 @@ Sonnet 5 带来了新的"effort"参数——用户可以控制模型推理深度
 
 隐形水印事件侵蚀了信任——无论 Anthropic 的动机多么正当，隐瞒就是隐瞒。Sonnet 5 本身是优秀的产品，但它的讨论被牵引到了更深层的焦虑：当你每天都在用 AI 写代码，五年后你还剩下什么技能？Fable 解禁本应是好消息，但社区的信任已经被透支——今天解禁，明天再禁，谁能接受这种不确定性？
 
-三条新闻的共性指向同一个方向：开发者正在意识到，把核心能力建立在别人控制的闭源系统上，风险比想象中更大。
+三条新闻分别指向三个不同层面的焦虑：隐写水印是对信任的侵蚀，技能退化是对个人竞争力的自省，出口管制则暴露了全球供应链的脆弱性。前两者是使用任何闭源 AI 工具都可能面临的问题，后者则是锚定美国公司特有的政治风险。
 
 ## 引用帖子
 
