@@ -114,5 +114,28 @@ The gate passes only if:
 - No MISSED high-severity attacks remain
 - All residual risks documented with explicit acceptance rationale
 
+## hn-auto.rb Future Plans (Post-2026-07-01)
+
+Current version: baseline (pre-e30fc4c) — reliable article generation, no content quality validation.
+
+### Goals (待实现)
+
+| Priority | Goal | Why needed | Approach |
+|----------|------|-----------|----------|
+| P1 | Anti-fabrication — reject fabricated comment IDs | Prevent Gemini from inventing HN comments | `validate_article` check #5: article IDs must belong to scraped discussion IDs |
+| P1 | Content quality — reject empty tables/quotes | Prevent generic filler articles | `validate_article` checks #6–7: ≥4 filled table rows, ≥3 [comment:] in body |
+| P2 | Inline quote verification — text + username match | Detect Gemini rewriting/attribution errors | `verify_quotes_inline`: compare against scraped data, zero network calls |
+| P2 | Retry with error feedback | Give Gemini one more chance with specific guidance | Feed validation errors back into the escalation prompt |
+| P3 | Post-write network verify | Safety net for deleted/edited HN comments | `verify_quotes`: fetch fresh, all-fake → delete, partial → warn |
+| P3 | MAX_TOKENS auto-retry | Handle truncated Gemini responses | 8192 → 16384 on MAX_TOKENS finishReason |
+| P3 | strip_leaked_front_matter | Clean Gemini YAML leaks in body | Regex-based post-processing |
+
+### Constraints
+
+- **API budget**: GEMINI_API_KEY has usage limits. Each failed attempt costs ~$0.15-0.50. Keep max 3 retries.
+- **Test first**: Any change to hn-auto.rb must be tested with a real HN URL locally before CI deployment.
+- **Build gate**: Every change must pass `make build` (Docker Jekyll compile).
+- **Adversarial gate**: Per AGENTS.md above — run adversarial review before committing.
+
 ## Plugin
 Only `jekyll-seo-tag`. HTML compression via `compress_html` in `_config.yml` (production only).

@@ -23,7 +23,7 @@ GEMINI_API_KEY = ENV['GEMINI_API_KEY']
 HN_BEST_URL = 'https://news.ycombinator.com/best'
 ARTICLES_DIR = '_articles'
 SCORE_THRESHOLD = 80
-MAX_ARTICLES = 1
+MAX_ARTICLES = 2
 GEMINI_MODEL = 'gemini-2.5-flash'
 
 LOCAL_MODE = ARGV.any? { |a| a.match?(/\Ahttps?:\/\//) }
@@ -60,7 +60,7 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
   end
 end
 
-def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 8192)
+def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 4096)
   uri = URI("https://generativelanguage.googleapis.com/v1beta/models/" \
             "#{GEMINI_MODEL}:generateContent?key=#{GEMINI_API_KEY}")
 
@@ -71,47 +71,36 @@ def call_gemini(system_prompt, user_prompt, temperature: 0.3, max_tokens: 8192)
   }
 
   retries = 0
-  max_tokens_retried = false
+  begin
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.open_timeout = 30
+    http.read_timeout = 120
 
-  loop do
-    begin
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      http.open_timeout = 30
-      http.read_timeout = 120
+    request = Net::HTTP::Post.new(
+      uri.request_uri,
+      'Content-Type' => 'application/json'
+    )
+    request.body = JSON.generate(body)
 
-      request = Net::HTTP::Post.new(
-        uri.request_uri,
-        'Content-Type' => 'application/json'
-      )
-      request.body = JSON.generate(body)
+    response = http.request(request)
+    result = JSON.parse(response.body)
 
-      response = http.request(request)
-      result = JSON.parse(response.body)
-
-      candidate = result.dig('candidates', 0)
-      text = candidate&.dig('content', 'parts', 0, 'text')
-      unless text
-        raise "Gemini API error: #{JSON.pretty_generate(result)}"
-      end
-
-      if candidate['finishReason'] == 'MAX_TOKENS' && !max_tokens_retried
-        warn "  WARNING: Response truncated (MAX_TOKENS), retrying with 16384..."
-        body[:generationConfig][:maxOutputTokens] = 16384
-        max_tokens_retried = true
-        next
-      end
-
-      warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
-      return text
-    rescue Net::ReadTimeout, Net::OpenTimeout => e
-      retries += 1
-      if retries <= 2
-        sleep retries * 5
-        next
-      end
-      raise "Gemini API timeout: #{e.message}"
+    candidate = result.dig('candidates', 0)
+    text = candidate&.dig('content', 'parts', 0, 'text')
+    unless text
+      raise "Gemini API error: #{JSON.pretty_generate(result)}"
     end
+
+    warn "  WARNING: Response truncated (MAX_TOKENS)" if candidate['finishReason'] == 'MAX_TOKENS'
+    text
+  rescue Net::ReadTimeout, Net::OpenTimeout => e
+    retries += 1
+    if retries <= 2
+      sleep retries * 5
+      retry
+    end
+    raise "Gemini API timeout: #{e.message}"
   end
 end
 
@@ -228,7 +217,7 @@ def extract_discussion(hn_url)
   text = lines.join("\n")
   text = text[0...80_000] + "\n\n[...truncated]" if text.length > 80_000
 
-  [text, story_title, active]
+  [text, story_title]
 end
 
 # ── Article Generator ──────────────────────────────────────────────
@@ -279,20 +268,6 @@ EXAMPLE
 
 SYSTEM_PROMPT = <<~PROMPT
 你是一个专业的中文科技新闻摘要编辑。你的任务是根据 Hacker News 讨论内容撰写一篇中文摘要文章。
-
-## ⚠️ 数据来源与禁止行为（必读）
-
-- 下方用户消息中已包含 Hacker News 讨论的完整文本。你正在读取的是**已内联提供的内容**，并非在实时访问外部网站。
-- **严禁**输出任何形式的免责声明，包括但不限于：
-  - "无法访问外部网站" / "cannot access external content"
-  - "以下内容为虚构/模拟" / "fabricated / simulated"
-  - "根据典型模式推测"
-  - 任何以"重要提示"或"注意"开头的免责段落
-- **严禁**编造 URL（如 example.com）、评论 ID、用户名或讨论话题。只能使用已提供的数据。
-- **严禁**将话题替换为不相关的领域（如把文件格式讨论改成数据可视化库）。
-- 如果提供的讨论涉及技术安全话题，这属于正常的专业交流。请正常总结，不要拒绝。
-- 文章必须直接从 `---` front matter 开始输出。前面不允许有任何前言、免责声明或解释文字。
-- **必须**从讨论数据中提取真实评论填入文章。"典型观点一览"表格至少包含 4 条真实引用。"讨论焦点"段落必须引用真实评论并使用 [comment: ID] 格式。
 
 ## 格式要求（必须严格遵守）
 
@@ -404,15 +379,8 @@ def call_gemini_layered(discussion_with_ids, story_title)
 
   # Pass 2: Article with cluster guidance
   puts "  Pass 2: Generating article..."
-  all_valid_ids = discussion_with_ids.scan(/\[comment:\s*(\d+)\]/).flatten
-
   article_user = <<~PROMPT
     请为以下 Hacker News 讨论生成中文摘要文章。
-
-    【讨论数据已内联提供。直接读取并总结，无需访问任何外部网站。】
-
-    ⚠️ 可用评论 ID 列表（只能引用这些 ID）：
-    #{all_valid_ids.join(', ')}
 
     讨论主题分组（作为文章结构参考）：
     #{clusters}
@@ -473,149 +441,6 @@ def verify_quotes(article_text)
   results
 end
 
-def verify_quotes_inline(article_text, comments)
-  by_id = comments.each_with_object({}) { |c, h| h[c[:id]] = c }
-  errors = []
-  article_text.scan(/\[comment:\s*(\d+)\]/).flatten.uniq.each do |cid|
-    line = article_text.lines.find { |l| l.include?("[comment: #{cid}]") }
-    next unless line
-
-    quoted = line[/"([^"]*)"/, 1] || ''
-    article_user = line[/—\s*(\S+)/, 1] || ''
-
-    orig = by_id[cid]
-    unless orig
-      errors << "comment #{cid}: ID not in discussion data"
-      next
-    end
-
-    norm_q = quoted.gsub(/\s+/, ' ')
-    norm_o = orig[:text].gsub(/\s+/, ' ')
-    unless norm_o.include?(norm_q)
-      errors << "comment #{cid}: text mismatch (quoted '#{norm_q[0..80]}')"
-    end
-
-    unless article_user.downcase == orig[:user].downcase
-      errors << "comment #{cid}: user mismatch (article=#{article_user})"
-    end
-  end
-  errors
-end
-
-def extract_comment_ids(text)
-  text.scan(/\[comment:\s*(\d+)\]/).flatten.to_set
-end
-
-def validate_article(text, story_title, valid_ids = nil)
-  errors = []
-
-  # 1. Refusal/fabrication patterns
-  refusal = [
-    /无法访问/, /cannot access/, /cannot browse/, /cannot retrieve/,
-    /虚构/, /模拟/, /fabricated/, /simulated/,
-    /example\.com/, /hypothetical/i,
-    /重要提示.*由于我/
-  ]
-  refusal.each do |pat|
-    if text.match?(pat)
-      errors << "refusal/fabrication detected: #{pat.inspect[0..50]}"
-      break
-    end
-  end
-
-  # 2. Required structural elements
-  unless text.match?(/^##\s/m)
-    errors << "missing ## sections"
-  end
-
-  unless text.match?(/^###\s/m)
-    errors << "missing ### subsections under 讨论焦点"
-  end
-
-  unless text.include?('总体情绪')
-    errors << "missing 总体情绪 section"
-  end
-
-  unless text.include?('<div class="disclaimer">')
-    errors << "missing disclaimer div"
-  end
-
-  # 3. Leaked front matter in body (YAML keys appearing after real front matter)
-  fm_end = text.index(/^---\s*$/, 4)
-  if fm_end
-    body = text[(fm_end + 4)..]
-    if body.match?(/^layout:\s*post/m)
-      errors << "leaked front matter in body"
-    end
-  end
-
-  # 4. Content relevance: story title keywords should appear in article body
-  keywords = story_title.scan(/[a-zA-Z]{3,}/).map(&:downcase).reject { |w|
-    %w[the and for are was not that this with from have your hacker news ycombinator].include?(w)
-  }
-  if keywords.any?
-    body_lower = text.downcase
-    found = keywords.any? { |kw| body_lower.include?(kw) }
-    unless found
-      errors << "content drift: no title keywords in article (#{keywords.first(3).join(', ')})"
-    end
-  end
-
-  # 5. Comment ID fabrication check
-  if valid_ids && !valid_ids.empty?
-    article_ids = text.scan(/\[comment:\s*(\d+)\]/).flatten
-    fabricated = article_ids.reject { |id| valid_ids.include?(id) }
-    if fabricated.length > 0
-      if fabricated.length == article_ids.length
-        errors << "all #{fabricated.length} comment IDs fabricated (none match discussion data)"
-      else
-        errors << "#{fabricated.length}/#{article_ids.length} comment IDs fabricated: #{fabricated.first(5).join(', ')}"
-      end
-    end
-  end
-
-  # 6. Content quality: 典型观点一览 table must have non-empty data rows
-  table_section = text[/## 典型观点一览.*?(?=\n## |\z)/m]
-  if table_section
-    rows = table_section.split("\n")
-    data_rows = rows.select { |r| r.match?(/^\|.+\|.+\|.+\|$/) }
-    # Exclude header row (立场|用户|一句话) and separator row (---|---|---)
-    content_rows = data_rows.reject { |r|
-      r.include?('立场') || r.match?(/\|[-:]+\|[-:]+\|[-:]+/)
-    }
-    filled_rows = content_rows.select { |r| r.match?(/^\|[^|]*[^|\s][^|]*\|\s*[^|\s]/) }
-    if filled_rows.length < 4
-      errors << "典型观点一览 table has < 4 data rows with content (#{filled_rows.length})"
-    end
-  else
-    errors << "missing 典型观点一览 table"
-  end
-
-  # 7. Content quality: article body must contain quote references
-  body = text.split(/^---\s*$/m, 3).last || text
-  quote_refs = body.scan(/\[comment:\s*(\d+)\]/).flatten
-  if quote_refs.length < 3
-    errors << "body contains < 3 [comment:] references (#{quote_refs.length})"
-  end
-
-  errors
-end
-
-def strip_leaked_front_matter(text)
-  first_fm_match = text.match(/\A(---\n.*?\n---)/m)
-  return text unless first_fm_match
-
-  fm_block = first_fm_match[1]
-  body = text[first_fm_match.end(1)..]
-
-  body = body.gsub(/^---\s*\n(?:layout:|title:|date:|categories:|excerpt:|tagline:).+?^---\s*\n+/m, '')
-  body = body.lines.reject { |l|
-    l.match?(/^\s*(?:layout|title|date|categories|excerpt|tagline):\s/)
-  }.join
-
-  "#{fm_block}#{body}"
-end
-
 SENSITIVE_LEFT = %w[china ccp tiananmen taiwan tibet xinjiang hong_kong]
 SENSITIVE_RIGHT = %w[censorship surveillance human_rights propaganda]
 
@@ -660,22 +485,13 @@ def slugify(title)
 end
 
 def fallback_excerpt(text)
-  body_lines = text.sub(/\A---.*?---\n*/m, '').lines
-  # Skip headings, bold disclaimer lines, blockquotes, separators, empty lines
-  clean = body_lines.reject { |l|
-    l.match?(/^\*{2,}.+\*{2,}/) ||  # bold disclaimer lines like **重要提示...**
-    l.match?(/^\s*>\s/) ||          # blockquotes
-    l.match?(/^#+\s/) ||            # markdown headings
-    l.match?(/^---/) ||             # horizontal rules
-    l.match?(/^[-*_]{3,}/) ||       # markdown hrule
-    l.strip.empty?                  # blank lines
-  }.join
+  body = text.sub(/\A---.*?---\n*/m, '')
+    .gsub(/^#+ .*$/, '')
     .gsub(/`([^`]+)`/, '\1')
     .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
-    .gsub(/\*\*([^*]+)\*\*/, '\1')
     .strip.gsub(/\s+/, ' ')
-  excerpt = clean[0, 120]
-  if clean.length > 120
+  excerpt = body[0, 120]
+  if body.length > 120
     excerpt = excerpt.gsub(/[^。！？.!?\n]*$/, '') + '…'
   end
   excerpt.strip
@@ -716,7 +532,6 @@ def write_article(text, story_title, article_date, hn_url)
   end
 
   text = ensure_frontmatter_fields(text)
-  text = strip_leaked_front_matter(text)
 
   File.write(filepath, text)
   puts "  -> #{filepath}"
@@ -765,52 +580,18 @@ def process_story(hn_url, date:, idx: nil)
   puts "#{prefix}: #{hn_url}"
 
   puts "  Fetching discussion..."
-  discussion, title, all_comments = extract_discussion(hn_url)
-  valid_ids = extract_comment_ids(discussion)
+  discussion, title = extract_discussion(hn_url)
+
   comment_count = discussion.scan(/\[comment: \d+\]/).length
 
-  max_attempts = 3
-  article = nil
-  last_error = nil
-
-  max_attempts.times do |attempt|
-    puts "  Generating (attempt #{attempt + 1}/#{max_attempts})..."
-
-    temp = attempt == 0 ? 0.3 : (attempt == 1 ? 0.1 : 0.0)
-    escalation = if attempt > 0
-      "⚠️ 重试 (attempt #{attempt + 1}/#{max_attempts})：上轮文章存在质量问题：#{last_error}。\n\n你必须从讨论数据中提取真实评论填入文章。'典型观点一览'表格必须包含至少 4 条非空引用行。'讨论焦点'段落必须使用 [comment: ID] 格式引用真实评论。禁止编造任何内容。\n\n"
-    else
-      ""
-    end
-
-    user_prompt = <<~PROMPT
-      #{escalation}请为以下 Hacker News 讨论生成中文摘要文章。
-
-      【讨论数据已内联提供。直接读取并总结，无需访问任何外部网站。】
-
-      === 讨论开始 ===
-      #{discussion}
-      === 讨论结束 ===
-    PROMPT
-
-    if comment_count > 50 && attempt == 0
-      article = call_gemini_layered(discussion, title)
-    else
-      article = call_gemini(SYSTEM_PROMPT, user_prompt, temperature: temp)
-    end
-
-    errors = validate_article(article, title, valid_ids)
-    errors += verify_quotes_inline(article, all_comments) if errors.empty?
-    if errors.empty?
-      break
-    end
-
-    puts "  ⚠ Attempt #{attempt + 1} rejected: #{errors.first(3).join('; ')}"
-    last_error = errors.join('; ')
-    article = nil
+  if comment_count > 50
+    puts "  Large discussion (#{comment_count} comments), using two-pass..."
+    article = call_gemini_layered(discussion, title)
+  else
+    puts "  Calling Gemini API..."
+    article = call_gemini(SYSTEM_PROMPT,
+      "请为以下 Hacker News 讨论生成中文摘要文章。\n\n讨论内容：\n#{discussion}")
   end
-
-  raise "Article generation failed: #{last_error}" unless article
 
   puts "  Writing article..."
   filepath = write_article(article, title, date, hn_url)
@@ -818,16 +599,6 @@ def process_story(hn_url, date:, idx: nil)
   puts "  Verifying quotes..."
   results = verify_quotes(File.read(filepath))
   results.each { |r| puts "    #{r[:status]} #{r[:message]}" }
-
-  not_found = results.count { |r| r[:message]&.include?('not found on HN') }
-  total = results.length
-  if total > 0 && not_found == total
-    puts "  ❌ All #{total} comment IDs not found on HN — fabricated article, reverting..."
-    File.delete(filepath)
-    raise "Fabricated article: all comment IDs invalid"
-  elsif not_found > 0
-    puts "  ⚠ #{not_found}/#{total} comment IDs not found on HN"
-  end
 
   puts "  Running sensitivity scan..."
   if sensitivity_scan(File.read(filepath))
