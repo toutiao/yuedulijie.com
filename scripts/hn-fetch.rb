@@ -24,7 +24,7 @@ CACHE_DIR = '_data/hn'
 CACHE_TTL = 3600
 HN_BEST_URL = 'https://news.ycombinator.com/best'
 SCORE_THRESHOLD = 80
-MAX_DEFAULT = 2
+MAX_DEFAULT = 15
 COMMENT_THRESHOLD = 1
 COMMENT_CAP = 40
 DISCUSSION_TRUNCATE = 80_000
@@ -102,7 +102,7 @@ end
 
 # ── HN discussion page parser ──
 
-DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments)
+DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments, :raw_comment_count)
 
 def parse_discussion_page(html, hn_url)
   doc = Nokogiri::HTML(html)
@@ -163,7 +163,7 @@ def parse_discussion_page(html, hn_url)
     active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
   end
 
-  DiscussionResult.new(post_title, post_url, score, author, posted_at, active)
+  DiscussionResult.new(post_title, post_url, score, author, posted_at, active, comments.length)
 end
 
 # ── Article extraction (nokogiri + reverse_markdown) ──
@@ -324,7 +324,8 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     'posted_at' => disc.posted_at,
     'fetched_at' => Time.now.utc.iso8601,
     'article_url' => disc.post_url,
-    'article_fetch_status' => nil
+    'article_fetch_status' => nil,
+    'raw_comment_count' => disc.raw_comment_count
   }
 
   article_url = disc.post_url
@@ -354,16 +355,18 @@ def print_result_line(result)
   title = post['title'] || ''
   score = post['score'] || 0
   comments = result['comments']
-  count = comments ? comments['comments'].length : 0
+  active_count = comments ? comments['comments'].length : 0
+  raw_count = post['raw_comment_count'] || 0
   article = result['article']
   astat = article ? (article['fetch_status'] || 'unknown') : 'unknown'
+  article_chars = (article && article['content']) ? article['content'].length : 0
 
   parts = []
   parts << "✓ #{id} \"#{title[0, 60]}\" (#{score} pts)"
-  parts << "#{count} comments"
+  parts << "raw:#{raw_count} active:#{active_count}#{active_count == 0 ? ' ⚠' : ''}"
 
   case astat
-  when 'success'      then parts << 'article extracted'
+  when 'success'      then parts << "article #{article_chars} chars"
   when 'skipped'      then parts << 'no article URL'
   when 'blocked'      then parts << 'article blocked'
   when 'not_found'    then parts << 'article 404'
@@ -453,7 +456,9 @@ def run
   articles_ok = 0
   errors = 0
 
-  candidates.each do |story|
+  candidates.each_with_index do |story, i|
+    sleep 1.5 if i > 0
+
     status, result, err = fetch_and_cache(
       story['hn_url'],
       known_meta: story,

@@ -671,10 +671,18 @@ def process_story(hn_url, date:, idx: nil, story: nil)
 
   unless discussion
     puts "  Cache miss, fetching live..."
+    sleep 1.5
     discussion, title = extract_discussion(hn_url)
   end
 
   comment_count = discussion.scan(/\[comment: \d+\]/).length
+
+  if comment_count == 0
+    puts "  ⚠ No comments found, skipping (no discussion data for Gemini)"
+    return nil
+  end
+
+  scraped_ids = discussion.scan(/\[comment:\s*(\d+)\]/).flatten
 
   article_prefix = if article_text
     "---原文内容（撰写「原文概要」时优先参考）---\n#{article_text}\n---原文结束---\n\n"
@@ -694,8 +702,20 @@ def process_story(hn_url, date:, idx: nil, story: nil)
   puts "  Writing article..."
   filepath = write_article(article, title, date, hn_url)
 
-  puts "  Verifying quotes..."
-  results = verify_quotes(File.read(filepath))
+  puts "  Checking for fabricated quotes..."
+  article_text_content = File.read(filepath)
+  article_ids = article_text_content.scan(/\[comment:\s*(\d+)\]/).flatten
+  fabricated = article_ids - scraped_ids
+  if fabricated.any?
+    fabricated.each { |id| puts "    ✗ comment #{id} not in scraped data" }
+    puts "  ✗ Fabricated quotes detected (#{fabricated.size}), deleting article..."
+    File.delete(filepath)
+    return nil
+  end
+  puts "    ✓ All quotes match scraped data" if article_ids.any?
+
+  puts "  Verifying quotes (network check)..."
+  results = verify_quotes(article_text_content)
   results.each { |r| puts "    #{r[:status]} #{r[:message]}" }
 
   puts "  Running sensitivity scan..."
@@ -764,7 +784,7 @@ def run
   selected.each_with_index do |story, i|
     begin
       path = process_story(story[:hn_url], date: now, idx: i + 1, story: story)
-      generated << path
+      generated << path if path
     rescue => e
       puts "  ERROR on story #{i + 1}: #{e.message}"
     end
