@@ -34,22 +34,24 @@ jobs:
 
       - name: Set week keys
         run: |
-          echo "WEEK_KEY=$(date -u +%Y-W%V)" >> $GITHUB_ENV
-          echo "PREV_WEEK_KEY=$(date -u -d '7 days ago' +%Y-W%V)" >> $GITHUB_ENV
+          echo "CUR_PATH=$(date -u +%G/W%V)" >> $GITHUB_ENV
+          echo "CUR_KEY=$(date -u +%G-W%V)" >> $GITHUB_ENV
+          echo "PREV_PATH=$(date -u -d '7 days ago' +%G/W%V)" >> $GITHUB_ENV
+          echo "PREV_KEY=$(date -u -d '7 days ago' +%G-W%V)" >> $GITHUB_ENV
 
       - name: Restore current week cache
         uses: actions/cache/restore@v4
         with:
-          path: _data/hn/${{ env.WEEK_KEY }}
-          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.WEEK_KEY }}-
+          path: _data/hn/${{ env.CUR_PATH }}
+          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.CUR_KEY }}-
 
       - name: Restore previous week cache
         uses: actions/cache/restore@v4
         with:
-          path: _data/hn/${{ env.PREV_WEEK_KEY }}
-          key: hn-data-${{ env.PREV_WEEK_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.PREV_WEEK_KEY }}-
+          path: _data/hn/${{ env.PREV_PATH }}
+          key: hn-data-${{ env.PREV_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.PREV_KEY }}-
 
       - name: Fetch HN data
         env:
@@ -95,5 +97,5 @@ jobs:
         # 时间戳）。当前标注「只读」是预期行为，先不加 save。
         uses: actions/cache/save@v4
         with:
-          path: _data/hn/${{ env.WEEK_KEY }}
-          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
+          path: _data/hn/${{ env.CUR_PATH }}
+          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}

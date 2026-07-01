@@ -160,12 +160,16 @@ Entry 2: 上周 (只恢复，不保存)
 
 ### CI 步骤
 
-1. 计算 `WEEK_KEY` = `date -u +%Y-W%V`, `PREV_WEEK_KEY` = `date -u -d '7 days ago' +%Y-W%V`
-2. Restore 当前周 cache entry → `_data/hn/<WEEK_KEY>/`
-3. Restore 上周 cache entry → `_data/hn/<PREV_WEEK_KEY>/`
+1. 计算 week key:
+   - `CUR_PATH` = `date -u +%G/W%V`（目录路径 `2026/W15`）
+   - `CUR_KEY` = `date -u +%G-W%V`（cache key 标识 `2026-W15`）
+   - `PREV_PATH` = `date -u -d '7 days ago' +%G/W%V`
+   - `PREV_KEY` = `date -u -d '7 days ago' +%G-W%V`
+2. Restore 当前周 cache entry → `_data/hn/<CUR_PATH>/`
+3. Restore 上周 cache entry → `_data/hn/<PREV_PATH>/`
 4. `hn-fetch.rb --best` → 仅写入当前周目录
 5. `hn-auto.rb` → 读缓存生成文章
-6. Save 当前周 cache entry
+6. Save 当前周 cache entry → key = `hn-data-<CUR_KEY>-<run_id>`
 
 ### 淘汰模型
 
@@ -276,22 +280,24 @@ jobs:
 
       - name: Set week keys
         run: |
-          echo "WEEK_KEY=$(date -u +%Y-W%V)" >> $GITHUB_ENV
-          echo "PREV_WEEK_KEY=$(date -u -d '7 days ago' +%Y-W%V)" >> $GITHUB_ENV
+          echo "CUR_PATH=$(date -u +%G/W%V)" >> $GITHUB_ENV
+          echo "CUR_KEY=$(date -u +%G-W%V)" >> $GITHUB_ENV
+          echo "PREV_PATH=$(date -u -d '7 days ago' +%G/W%V)" >> $GITHUB_ENV
+          echo "PREV_KEY=$(date -u -d '7 days ago' +%G-W%V)" >> $GITHUB_ENV
 
       - name: Restore current week cache
         uses: actions/cache/restore@v4
         with:
-          path: _data/hn/${{ env.WEEK_KEY }}
-          key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.WEEK_KEY }}-
+          path: _data/hn/${{ env.CUR_PATH }}
+          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.CUR_KEY }}-
 
       - name: Restore previous week cache
         uses: actions/cache/restore@v4
         with:
-          path: _data/hn/${{ env.PREV_WEEK_KEY }}
-          key: hn-data-${{ env.PREV_WEEK_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.PREV_WEEK_KEY }}-
+          path: _data/hn/${{ env.PREV_PATH }}
+          key: hn-data-${{ env.PREV_KEY }}-${{ github.run_id }}
+          restore-keys: hn-data-${{ env.PREV_KEY }}-
 
       - name: Fetch HN data
         run: bundle exec ruby scripts/hn-fetch.rb --best
@@ -300,24 +306,30 @@ jobs:
         run: bundle exec ruby scripts/hn-auto.rb --from-cache
 
       - name: Build Jekyll
+        id: jekyll_build
         run: bundle exec jekyll build
+        continue-on-error: true
 
-      - name: Commit articles
+      - name: Revert on build failure
+        if: steps.jekyll_build.outcome == 'failure'
+        run: |
+          git checkout -- _articles/
+          exit 1
+
+      - name: Commit and push articles
+        if: steps.jekyll_build.outcome == 'success'
         run: |
           git add -A _articles/
           if [ -n "$(git status --porcelain _articles/)" ]; then
             git commit -m "feat: HN 自动摘要 $(date -u +%Y-%m-%d)"
-            git push origin HEAD
+            git push origin HEAD || (git pull --rebase && git push)
           fi
 
       - name: Save current week cache
-        # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
-        # 如果实测发现上周 entry 提前过期（<7天），原因是 restore 不计为
-        # activity。解决：给上周也加 cache/save（相同 key 覆盖，刷新活动
-        # 时间戳）。当前标注「只读」是预期行为，先不加 save。
         uses: actions/cache/save@v4
         with:
-          path: _data/hn/${{ env.WEEK_KEY }}
+          path: _data/hn/${{ env.CUR_PATH }}
+          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
           key: hn-data-${{ env.WEEK_KEY }}-${{ github.run_id }}
 ```
 
