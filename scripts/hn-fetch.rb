@@ -25,7 +25,7 @@ CACHE_TTL = 3600
 HN_BEST_URL = 'https://news.ycombinator.com/best'
 SCORE_THRESHOLD = 80
 MAX_DEFAULT = 15
-COMMENT_THRESHOLD = 1
+COMMENT_THRESHOLD = 0
 COMMENT_CAP = 40
 DISCUSSION_TRUNCATE = 80_000
 ARTICLE_TRUNCATE = 8000
@@ -158,7 +158,7 @@ def parse_discussion_page(html, hn_url)
     }
   end
 
-  active = comments.select { |c| c['score'] > COMMENT_THRESHOLD }
+  active = comments.select { |c| c['score'] >= COMMENT_THRESHOLD }
   if active.length > 20
     active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
   end

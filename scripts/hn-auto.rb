@@ -272,7 +272,7 @@ def extract_discussion(hn_url)
   end
 
   # Filter low-scored comments
-  active = comments.select { |c| c[:score] > 1 }
+  active = comments.select { |c| c[:score] >= 0 }
 
   # Sort by score desc, cap at 40
   if active.length > 20
