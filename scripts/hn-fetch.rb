@@ -441,7 +441,7 @@ def run
   end
 
   puts "\n[1/3] Fetching HN best page..."
-  html = fetch(HN_BEST_URL)
+  _, html = fetch(HN_BEST_URL)
   stories = parse_best_page(html)
   puts "  #{stories.length} stories"
   write_stories_index(stories, options[:output] || CACHE_DIR)
