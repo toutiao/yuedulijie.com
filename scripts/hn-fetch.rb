@@ -26,11 +26,17 @@ HN_BEST_URL = 'https://news.ycombinator.com/best'
 SCORE_THRESHOLD = 80
 MAX_DEFAULT = 15
 COMMENT_THRESHOLD = 0
-COMMENT_CAP = 40
+COMMENT_CAP = 100
 DISCUSSION_TRUNCATE = 80_000
 ARTICLE_TRUNCATE = 8000
 
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0',
+]
 
 # ── HTTP ──
 
@@ -42,7 +48,14 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
     http.use_ssl = uri.scheme == 'https'
     http.open_timeout = timeout
     http.read_timeout = timeout
-    request = Net::HTTP::Get.new(uri.request_uri, 'User-Agent' => USER_AGENT)
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request['User-Agent'] = USER_AGENTS.sample
+    request['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    request['Accept-Language'] = 'en-US,en;q=0.9'
+    request['Accept-Encoding'] = 'gzip, deflate, br'
+    request['DNT'] = '1'
+    request['Connection'] = 'keep-alive'
+    request['Upgrade-Insecure-Requests'] = '1'
     response = http.request(request)
     [response.code.to_i, response.body.force_encoding('UTF-8')]
   rescue Net::ReadTimeout, Net::OpenTimeout,
@@ -475,7 +488,7 @@ def run
   errors = 0
 
   candidates.each_with_index do |story, i|
-    sleep 1.5 if i > 0
+    sleep rand(2.0..5.0) if i > 0
 
     status, result, err = fetch_and_cache(
       story['hn_url'],
