@@ -24,14 +24,13 @@ Stories must pass all:
 - same topic not covered today (grep today's date + keyword in existing articles)
 
 ### Auto mode
-1. Source: try hn-fetch cache (`_data/hn/20*/W*/stories.yaml`) → parse most recent week
-2. If cache missing → `webfetch` HN best (text format)
-3. Parse: title + score + item URL
-4. Apply filters (All modes section)
-5. Sort by score descending
-6. Auto-select top candidate
-7. Report: "Auto-selected: [title] ([score] pts)"
-8. Proceed to Phase 0.5
+1. Source: `webfetch` https://news.ycombinator.com/best?h=48 (text format)
+2. Parse: title + score + item URL
+3. Apply filters (All modes section)
+4. Sort by score descending
+5. Auto-select top candidate
+6. Report: "Auto-selected: [title] ([score] pts)"
+7. Proceed to Phase 0.5
 
 ### Interactive mode
 1. `webfetch` https://news.ycombinator.com/best?h=48 (text format)
@@ -85,25 +84,18 @@ From selected post title: drop leading common words (Claude, new, update, Introd
 
 ## Phase 1 — Fetch + Analyze
 
-### Cache strategy (try before webfetch)
+### Cache strategy
 
-| Cache state | Action |
-|-------------|--------|
-| `_data/hn/20*/W*/<post_id>/comments.yaml` exists, comments non-empty | Use cached data. Skip webfetch. |
-| Cache exists but comments empty | Cache stale → fall back to webfetch |
-| No cache | `webfetch` HN page |
-
-Also check `_data/hn/*/<post_id>/article.yaml` for cached article text.
-If `fetch_status == 'success'`: include in Gemini prompt context.
+Always `webfetch` HN page and linked article. No cache fallback.
 
 ### Single post mode
-1. `webfetch` HN page (markdown) — skip if valid cache
-2. If linked article exists, `webfetch` target page — skip if cached
+1. `webfetch` HN page (markdown)
+2. If linked article exists, `webfetch` target page
 3. Extract: topic clusters / quotes+usernames / unique opinions
 4. Record HN comment item id for each quote used
 
 ### Cluster mode
-1. Main post: top 20 top-level comments (cache or webfetch)
+1. Main post: top 20 top-level comments (webfetch)
 2. Each related post: top 8 top-level comments
 3. Track `thread_id` per quote (e.g. "[thread 2]")
 4. Merge all comments, group by theme (not by thread)
