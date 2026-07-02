@@ -1,0 +1,17 @@
+name: 'Setup OpenCode'
+description: 'Install opencode CLI'
+inputs:
+  version:
+    description: 'Version to install (e.g. 1.17.12)'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          curl -fsSL https://opencode.ai/install | bash -s -- --version "${{ inputs.version }}"
+        else
+          curl -fsSL https://opencode.ai/install | bash
+        fi

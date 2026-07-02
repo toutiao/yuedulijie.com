@@ -61,6 +61,8 @@ jobs:
       - name: Fetch HN data (cache layer)
         run: bundle exec ruby scripts/hn-fetch.rb --best
 
+      - uses: ./.github/actions/setup-opencode
+
       - name: Generate articles (opencode auto)
         env:
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
