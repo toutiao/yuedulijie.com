@@ -87,7 +87,7 @@ jobs:
 
       - name: Generate articles (opencode auto)
         env:
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           # Clean up any orphaned _articles/ from previous failed run
