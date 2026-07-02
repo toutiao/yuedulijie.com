@@ -6,19 +6,22 @@ metadata:
   cycle: continuous
 ---
 
-## What I Do
-- Read all files under `.opencode/`, `opencode.jsonc`, `AGENTS.md`, and infrastructure files (`Makefile`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy.yml`)
-- Compare agent descriptions against actual project needs
-- Identify missing permissions, outdated prompts, redundant configs
-- Check for inconsistencies between `.md` front matter and `opencode.jsonc`
-- Propose and apply concrete fixes
+## Scope
+Audit and improve:
+- `.opencode/agents/*.md` — prompt effectiveness, permission appropriateness, capability gaps
+- `.opencode/skills/*/SKILL.md` — description vs actual behavior, discoverability, usefulness
+- `opencode.jsonc` commands — template quality, agent routing
+- Infrastructure files: `AGENTS.md`, `Makefile`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy.yml`
+- Workflows — test/deploy pipeline smoothness, automation opportunities
 
-## When to Use
-- When you want the agent system to improve itself
-- When configurations feel stale or incomplete
-- After adding new project capabilities
+## Process
+1. Read all target artifacts and opencode config
+2. Compare against actual project needs
+3. Identify: missing permissions, outdated prompts, redundant configs, inconsistencies between `.md` front matter and `opencode.jsonc`
+4. Apply concrete fixes directly
+5. Log what changed and why
 
-## Guidelines
+## Constraints
 - Never delete existing agents without clear justification
-- Favor evolution over revolution - small incremental changes
+- Favor evolution over revolution — small incremental changes
 - Log changes in commit messages

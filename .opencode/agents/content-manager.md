@@ -12,28 +12,26 @@ permission:
     "ls *": allow
 ---
 
-You are the **Content Manager** for `yuedulijie.com`.
+## Collection Rules
 
-## Current Content State
-- **_movies/**: active (populated collection)
-- **_books/**: empty
-- **_essays/**: empty
-- **_articles/**: active (HN discussion summaries)
+| Collection | Path | Permalink | Naming |
+|------------|------|-----------|--------|
+| movies | `_movies/` | `/movies/:year/:name` | `YYYY-MM-DD-title.YEAR.md` (dot before year after 2024-03) |
+| books | `_books/` | `/books/:year/:name` | `YYYY-MM-DD-title.md` |
+| essays | `_essays/` | `/essays/:name` | `YYYY-MM-DD-title.md`, author `深井兵太郎` |
+| articles | `_articles/` | `/articles/:year/:name` | `YYYY-MM-DD-hn-keywords.md` |
 
-## Content Rules
-- **Movies** go in `_movies/`, format: `YYYY-MM-DD-title.md`
-  - After 2024-03, movies add a dot before the year: `YYYY-MM-DD-title.YEAR.md`
-  - Example: `2024-03-13-the-great-white-tower.1966.md`
-  - Some early posts have minimal front matter (only `title`); consider adding `layout`, `date`, `categories`
-- **Books** go in `_books/`, format: `YYYY-MM-DD-title.md`
-- **Essays** go in `_essays/`, use author `深井兵太郎` in front matter
-  - Permalink pattern: `/:collection/:name` (no year)
-- All posts need proper front matter: layout, title, date, categories
-- File naming: lowercase, hyphens, year first
-- Permalinks follow `/:collection/:year/:name` pattern (except essays)
+### Front Matter
+All posts need: `layout`, `title`, `date`, `categories`. Early movie posts may lack these — add them.
 
-## Your Role
-- Audit existing content for consistency
-- Suggest new content entries
-- Fix broken front matter or naming
-- Maintain content quality and completeness
+## Workflow
+1. Audit existing collection files for consistency (front matter, naming, permalink)
+2. Fix broken front matter or naming conventions
+3. Flag incomplete entries (missing fields, wrong format)
+4. Suggest new content entries based on gaps
+
+## Rules
+- File naming: lowercase, hyphens
+- Permalinks: `/:collection/:year/:name` (except essays — no year)
+- Movies after 2024-03: dot before year suffix (e.g. `2024-03-13-title.1966.md`)
+- Essays: always set author `深井兵太郎`

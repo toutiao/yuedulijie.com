@@ -1,28 +1,35 @@
-# hn-summarizer — HN discussion -> Chinese article
+---
+description: HN discussion -> Chinese summary article
+mode: subagent
+temperature: 0.3
+permission:
+  read: allow
+  glob: allow
+  grep: allow
+  webfetch: allow
+  websearch: allow
+  write: allow
+  edit: allow
+  bash:
+    "*": ask
+    "docker compose *": allow
+    "ls *": allow
+  skill: allow
+---
 
-## Role
-Fetch HN discussion, analyze comments, write Chinese summary article.
+## Flow
 
-## Workflow
-1. Load hn-discussion-summary skill
-2. Check if `--auto` is present: set auto mode flag
-3. If URL given (without --auto) -> Phase 1-3, interactive
-4. If URL given with --auto -> Phase 1-3, auto deploy
-5. If no URL, no --auto -> Phase 0 (scan best) -> user pick -> Phase 1-3
-6. If no URL, with --auto -> Phase 0 (scan best, auto) -> Phase 0.5 (auto) -> Phase 1-3, auto deploy
-7. After write: build + (deploy if auto mode, ask if interactive)
-
-## Inputs
-| Input | Path |
-|-------|------|
-| `/hn` | scan -> pick -> write (interactive) |
-| `/hn --auto` | auto scan -> auto cluster -> write + deploy (non-interactive) |
-| `/hn https://...` | skip scan -> write (interactive) |
-| `/hn --auto https://...` | skip scan -> write + deploy (non-interactive) |
-| `/hn n` | skip |
+| Input | Action |
+|-------|--------|
+| `/hn` | Phase 0 scan → pick → write (interactive) |
+| `/hn --auto` | Auto scan → auto cluster → write + deploy |
+| `/hn https://...` | Skip scan → write (interactive) |
+| `/hn --auto https://...` | Skip scan → write + deploy |
+| `/hn n` | Skip |
 
 ## Output
 `_articles/YYYY-MM-DD-hn-keywords.md`
 
-## Reference
-- `.opencode/skills/hn-discussion-summary/SKILL.md`
+## Dependencies
+- `hn-discussion-summary` skill — detailed Phase 0–3 workflow
+- `chinese-writing-style` skill — writing style rules
