@@ -17,6 +17,32 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
+require 'ferrum'
+
+$hn_browser = nil
+
+def hn_browser
+  $hn_browser ||= Ferrum::Browser.new(
+    headless: true,
+    timeout: 30,
+    browser_options: {
+      'no-sandbox': nil,
+      'disable-gpu': nil,
+      'disable-dev-shm-usage': nil,
+      'window-size': '1920,1080',
+    }
+  )
+end
+
+def fetch_with_browser(url)
+  b = hn_browser
+  b.go_to(url)
+  status_code = b.status_code || 200
+  html = b.body
+  [status_code, html]
+rescue => e
+  raise "Browser fetch failed for #{url}: #{e.message}"
+end
 
 $stdout.sync = true
 
@@ -321,7 +347,7 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
   end
 
   begin
-    status_code, html = fetch(hn_url)
+    status_code, html = fetch_with_browser(hn_url)
   rescue => e
     return [:error, nil, "fetch discussion failed: #{e.message}"]
   end
@@ -331,7 +357,7 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
   if disc.raw_comment_count == 0 && known_meta && known_meta['score'].to_i >= SCORE_THRESHOLD
     if status_code == 429 || html.match?(/Sorry/)
       sleep 30
-      _, html = fetch(hn_url)
+      _, html = fetch_with_browser(hn_url)
       disc = parse_discussion_page(html, hn_url)
     end
   end
@@ -463,7 +489,7 @@ def run
   end
 
   puts "\n[1/3] Fetching HN best page..."
-  _, html = fetch(HN_BEST_URL)
+  _, html = fetch_with_browser(HN_BEST_URL)
   stories = parse_best_page(html)
   puts "  #{stories.length} stories"
   write_stories_index(stories, options[:output] || CACHE_DIR)
@@ -512,6 +538,8 @@ def run
 
   puts "\n---"
   puts "Summary: #{fetched} fetched, #{cached} cached, #{articles_ok} articles, #{errors} errors"
+ensure
+  $hn_browser&.quit
 end
 
 run
