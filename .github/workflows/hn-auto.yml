@@ -59,30 +59,6 @@ jobs:
             "AUTHORIZATION: basic $(printf '%s:' "$PAT" | base64 -w0)"
           git remote set-url origin "https://github.com/${{ github.repository }}"
 
-      - name: Set week keys
-        run: |
-          echo "CUR_PATH=$(date -u +%G/W%V)" >> $GITHUB_ENV
-          echo "CUR_KEY=$(date -u +%G-W%V)" >> $GITHUB_ENV
-          echo "PREV_PATH=$(date -u -d '7 days ago' +%G/W%V)" >> $GITHUB_ENV
-          echo "PREV_KEY=$(date -u -d '7 days ago' +%G-W%V)" >> $GITHUB_ENV
-
-      - name: Restore current week cache
-        uses: actions/cache/restore@v4
-        with:
-          path: _data/hn/${{ env.CUR_PATH }}
-          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.CUR_KEY }}-
-
-      - name: Restore previous week cache
-        uses: actions/cache/restore@v4
-        with:
-          path: _data/hn/${{ env.PREV_PATH }}
-          key: hn-data-${{ env.PREV_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.PREV_KEY }}-
-
-      - name: Fetch HN data (cache layer)
-        run: bundle exec ruby scripts/hn-fetch.rb --best
-
       - uses: ./.github/actions/setup-opencode
 
       - name: Generate articles (opencode auto)
@@ -118,13 +94,3 @@ jobs:
 
       - name: Push to master
         run: git push
-
-      - name: Save current week cache
-        # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
-        # 如果实测发现上周 entry 提前过期（<7天），原因是 restore 不计为
-        # activity。解决：给上周也加 cache/save（相同 key 覆盖，刷新活动
-        # 时间戳）。当前标注「只读」是预期行为，先不加 save。
-        uses: actions/cache/save@v4
-        with:
-          path: _data/hn/${{ env.CUR_PATH }}
-          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}

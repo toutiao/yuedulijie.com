@@ -1,0 +1,30 @@
+name: HN Data Fetcher
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set cache key
+        run: echo "CACHE_KEY=hn-data-$(date -u +%Y-W%V)-${{ github.run_id }}" >> $GITHUB_ENV
+
+      - name: Restore previous cache (avoid refetching)
+        uses: actions/cache/restore@v4
+        with:
+          path: _data/hn
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: hn-data-$(date -u +%Y-W%V)-
+
+      - name: Fetch HN data
+        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        with:
+          path: _data/hn
+          key: ${{ env.CACHE_KEY }}
