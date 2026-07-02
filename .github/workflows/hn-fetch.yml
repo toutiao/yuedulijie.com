@@ -24,7 +24,7 @@ jobs:
           restore-keys: hn-data-$(date -u +%Y-W%V)-
 
       - name: Fetch HN data
-        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15
+        run: ruby scripts/hn-fetch.rb --best --max 15
 
       - name: Save cache
         uses: actions/cache/save@v4
