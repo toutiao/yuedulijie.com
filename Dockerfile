@@ -3,9 +3,6 @@ FROM ruby:3.2-slim AS base
 ARG APT_MIRROR=
 ARG GEM_MIRROR=
 
-# Trust mounted site directory (volume mount at runtime)
-RUN git config --global --add safe.directory /site
-
 RUN if [ -n "$APT_MIRROR" ]; then \
       sed -i "s|deb.debian.org|$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
       sed -i "s|deb.debian.org|$APT_MIRROR|g" /etc/apt/sources.list; \
@@ -15,7 +12,8 @@ RUN if [ -n "$APT_MIRROR" ]; then \
       build-essential \
       git \
       nodejs \
-      && rm -rf /var/lib/apt/lists/*
+      && rm -rf /var/lib/apt/lists/* && \
+    git config --global --add safe.directory /site
 
 WORKDIR /site
 
