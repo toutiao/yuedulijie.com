@@ -72,7 +72,7 @@ cat > ~/.config/systemd/user/actions.runner.${SLUG}.service <<-EOF
 Description=GitHub Actions Runner ($REPO)
 
 [Service]
-ExecStart=$RUNNER_DIR/runsvc.sh
+ExecStart=$RUNNER_DIR/bin/runsvc.sh
 WorkingDirectory=$RUNNER_DIR
 Restart=on-failure
 RestartSec=300
