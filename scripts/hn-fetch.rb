@@ -17,29 +17,16 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
-require 'ferrum'
+require 'net/http'
+require 'uri'
 
-$hn_browser = nil
-
-def hn_browser
-  $hn_browser ||= Ferrum::Browser.new(
-    headless: true,
-    timeout: 30,
-    browser_options: {
-      'no-sandbox': nil,
-      'disable-gpu': nil,
-      'disable-dev-shm-usage': nil,
-      'window-size': '1920,1080',
-    }
-  )
-end
+RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 
 def fetch_with_browser(url)
-  b = hn_browser
-  b.go_to(url)
-  status_code = b.status_code || 200
-  html = b.body
-  [status_code, html]
+  uri = URI("#{RENDERER_URL}/render")
+  uri.query = URI.encode_www_form(url: url)
+  resp = Net::HTTP.get_response(uri)
+  [resp.code.to_i, resp.body.force_encoding('UTF-8')]
 rescue => e
   raise "Browser fetch failed for #{url}: #{e.message}"
 end
@@ -538,8 +525,6 @@ def run
 
   puts "\n---"
   puts "Summary: #{fetched} fetched, #{cached} cached, #{articles_ok} articles, #{errors} errors"
-ensure
-  $hn_browser&.quit
 end
 
 run

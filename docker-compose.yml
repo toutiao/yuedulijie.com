@@ -40,5 +40,21 @@ services:
       - https_proxy=${HTTPS_PROXY:-}
       - no_proxy=${NO_PROXY:-}
 
+  renderer:
+    build:
+      context: playwright-renderer
+      network: host
+      args:
+        http_proxy: http://127.0.0.1:64540
+        https_proxy: http://127.0.0.1:64540
+        no_proxy: localhost,127.0.0.0/8,::1
+    image: yuedulijie-renderer:latest
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - http_proxy=http://127.0.0.1:64540
+      - https_proxy=http://127.0.0.1:64540
+      - no_proxy=localhost,127.0.0.0/8,::1
+
 volumes:
   bundle_data:
