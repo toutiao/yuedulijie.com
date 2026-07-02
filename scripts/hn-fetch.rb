@@ -65,6 +65,7 @@ def fetch_stories
       'hn_url' => "https://news.ycombinator.com/item?id=#{id}",
       'score' => item['score'],
       'author' => item['by'] || '',
+      'descendants' => item['descendants'] || 0,
     }
   end.compact.first(MAX_DEFAULT)
 end
@@ -258,10 +259,14 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
   return [:error, nil, "no post_id extracted from #{hn_url}"] unless post_id
 
   if !force && cache_fresh?(post_id)
-    cached = load_cached_post(post_id)
+    cached_post = load_cached_post(post_id)
     comments = load_cached_comments(post_id)
     article = load_cached_article(post_id)
-    return [:cached, { 'post' => cached, 'comments' => comments, 'article' => article }, nil]
+    # descendants 未变 → 无新评论，跳过
+    if cached_post && known_meta && known_meta['descendants'] == cached_post['raw_comment_count']
+      return [:cached, { 'post' => cached_post, 'comments' => comments, 'article' => article }, nil]
+    end
+    return [:cached, { 'post' => cached_post, 'comments' => comments, 'article' => article }, nil]
   end
 
   disc = fetch_discussion(post_id)
@@ -290,7 +295,12 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
   article_url = disc.post_url
   article_url = known_meta['url'] if article_url.nil? && known_meta
 
-  article_data = extract_article(article_url)
+  cached_article = load_cached_article(post_id)
+  if cached_article && cached_article['fetch_status'] == 'success' && cached_article['url'] == article_url
+    article_data = cached_article
+  else
+    article_data = extract_article(article_url)
+  end
   post_data['article_fetch_status'] = article_data['fetch_status']
 
   comments_data = { 'comments' => disc.comments }
