@@ -111,7 +111,7 @@ jobs:
           fi
           opencode run "$HN_CMD" --dir . \
             --dangerously-skip-permissions \
-            --model "$MODEL" 2>&1
+            --model "$MODEL" --print-logs 2>&1 | sed '/^timestamp=/d'
 
       - name: Save current week cache
         # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
