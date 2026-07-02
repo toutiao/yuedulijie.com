@@ -43,7 +43,8 @@ def fetch(uri_str, max_retries: 2, timeout: 30)
     http.open_timeout = timeout
     http.read_timeout = timeout
     request = Net::HTTP::Get.new(uri.request_uri, 'User-Agent' => USER_AGENT)
-    http.request(request).body.force_encoding('UTF-8')
+    response = http.request(request)
+    [response.code.to_i, response.body.force_encoding('UTF-8')]
   rescue Net::ReadTimeout, Net::OpenTimeout,
          Errno::ECONNREFUSED, Errno::ECONNRESET => e
     retries += 1
@@ -184,7 +185,7 @@ def extract_article(url)
   end
 
   begin
-    html = fetch(url, timeout: 20)
+    _, html = fetch(url, timeout: 20)
     doc = Nokogiri::HTML(html)
 
     result['title'] = doc.at_css('title')&.text&.strip
@@ -307,12 +308,20 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
   end
 
   begin
-    html = fetch(hn_url)
+    status_code, html = fetch(hn_url)
   rescue => e
     return [:error, nil, "fetch discussion failed: #{e.message}"]
   end
 
   disc = parse_discussion_page(html, hn_url)
+
+  if disc.raw_comment_count == 0 && known_meta && known_meta['score'].to_i >= SCORE_THRESHOLD
+    if status_code == 429 || html.match?(/Sorry/)
+      sleep 10
+      _, html = fetch(hn_url)
+      disc = parse_discussion_page(html, hn_url)
+    end
+  end
 
   post_data = {
     'id' => post_id,

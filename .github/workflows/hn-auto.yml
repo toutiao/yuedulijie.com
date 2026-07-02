@@ -113,6 +113,12 @@ jobs:
             --dangerously-skip-permissions \
             --model "$MODEL" --print-logs 2>&1 | sed '/^timestamp=/d'
 
+      - name: Validate Jekyll build
+        run: bundle exec jekyll build
+
+      - name: Push to master
+        run: git push
+
       - name: Save current week cache
         # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
         # 如果实测发现上周 entry 提前过期（<7天），原因是 restore 不计为

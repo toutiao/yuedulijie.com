@@ -221,16 +221,17 @@ After quote verification, scan article body (including blockquotes, excluding di
 2. Validate date field:
    - `grep "date: $(date +%Y-%m-%d)"` article file
    - Match → continue
-   - Mismatch → error "date field mismatch", auto-correct to today, rebuild
-3. `bundle exec jekyll build`
-4. If build fails: report errors, fix, rebuild (max 1 retry)
+   - Mismatch → error "date field mismatch", auto-correct to today
+3. Build:
+   - **Auto/CI mode**: Skip build (CI validates in a separate step, no Docker).
+   - **Interactive mode**: `make build` (Docker) — if fail, fix & rebuild (max 1 retry).
 
 ### Auto mode (--auto or CI)
 
 | Tag | Action |
 |-----|--------|
-| Normal (no tag) | `git add -A && git commit -m "feat: HN 自动摘要 $(date +%Y-%m-%d)" && git push` |
-| Flagged (`⚑` sensitive or `⚑` political context) | Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only." → commit + push same as normal + show warning: "⚠ Sensitive article deployed. Review recommended." |
+| Normal (no tag) | `git add -A && git commit -m "feat: HN 自动摘要 $(date +%Y-%m-%d)"` (CI will push) |
+| Flagged (`⚑` sensitive or `⚑` political context) | Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only." → commit same as normal + show warning: "⚠ Sensitive article deployed. Review recommended." |
 
 Exit 0 on success. No user prompts.
 
