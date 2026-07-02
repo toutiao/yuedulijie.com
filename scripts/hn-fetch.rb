@@ -22,9 +22,11 @@ require 'uri'
 
 RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 
-def fetch_with_browser(url)
+def fetch_with_browser(url, js_render: false)
   uri = URI("#{RENDERER_URL}/render")
-  uri.query = URI.encode_www_form(url: url)
+  params = { url: url }
+  params[:js_render] = '1' if js_render
+  uri.query = URI.encode_www_form(params)
   resp = Net::HTTP.get_response(uri)
   [resp.code.to_i, resp.body.force_encoding('UTF-8')]
 rescue => e
@@ -211,7 +213,7 @@ def extract_article(url)
   end
 
   begin
-    _, html = fetch(url, timeout: 20)
+    _, html = fetch_with_browser(url, js_render: true)
     doc = Nokogiri::HTML(html)
 
     result['title'] = doc.at_css('title')&.text&.strip
