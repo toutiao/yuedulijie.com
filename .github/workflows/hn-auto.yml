@@ -6,9 +6,31 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: "Model override (default google/gemini-2.5-flash, use deepseek/deepseek-v4-flash as fallback)"
+        description: "AI 模型（默认 google/gemini-2.5-flash）"
+        type: choice
         required: false
         default: "google/gemini-2.5-flash"
+        options:
+          - "google/gemini-2.5-flash"
+          - "google/gemini-2.5-pro"
+          - "deepseek/deepseek-v4-flash"
+      mode:
+        description: "运行模式 — auto 自动选择 / url 手动指定"
+        type: choice
+        required: false
+        default: "auto"
+        options:
+          - "auto"
+          - "url"
+      hn_url:
+        description: "HN 讨论 URL（mode=url 时必填）"
+        required: false
+        default: ""
+      force_fetch:
+        description: "强制重新抓取，忽略缓存"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -73,7 +95,21 @@ jobs:
           git clean -fd _articles/ 2>/dev/null || true
           MODEL='${{ inputs.model }}'
           if [ -z "$MODEL" ]; then MODEL='google/gemini-2.5-flash'; fi
-          opencode run '/hn --auto' --dir . \
+          MODE='${{ inputs.mode }}'
+          HN_URL='${{ inputs.hn_url }}'
+          FORCE='${{ inputs.force_fetch }}'
+          FLAGS=""
+          [ "$FORCE" = "true" ] && FLAGS="--force"
+          if [ "$MODE" = "url" ]; then
+            if [ -z "$HN_URL" ]; then
+              echo "ERROR: mode=url 但 hn_url 为空"
+              exit 1
+            fi
+            HN_CMD="/hn $HN_URL $FLAGS"
+          else
+            HN_CMD="/hn --auto $FLAGS"
+          fi
+          opencode run "$HN_CMD" --dir . \
             --dangerously-skip-permissions \
             --model "$MODEL" \
             --print-logs 2>&1
