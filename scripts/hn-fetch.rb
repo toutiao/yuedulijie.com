@@ -317,7 +317,7 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
 
   if disc.raw_comment_count == 0 && known_meta && known_meta['score'].to_i >= SCORE_THRESHOLD
     if status_code == 429 || html.match?(/Sorry/)
-      sleep 10
+      sleep 30
       _, html = fetch(hn_url)
       disc = parse_discussion_page(html, hn_url)
     end
