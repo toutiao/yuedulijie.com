@@ -28,12 +28,17 @@ services:
     image: yuedulijie-jekyll:latest
     profiles:
       - cli
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/site
       - bundle_data:/usr/local/bundle
     environment:
       - JEKYLL_ENV=production
       - PAGES_REPO_NWO=Lax/yuedulijie.com
+      - http_proxy=${HTTP_PROXY:-}
+      - https_proxy=${HTTPS_PROXY:-}
+      - no_proxy=${NO_PROXY:-}
 
 volumes:
   bundle_data:

@@ -168,7 +168,7 @@ tagline: "浮夸版（不对外展示，搜索引擎可见）"
 3. **典型观点一览** — table, columns: 立场 / 用户 / 一句话
 4. **总体情绪** — 1-2 paragraphs
 5. **引用帖子** — markdown table: # / 标题 / URL (auto-generated)
-6. **免责声明** — `<div class="disclaimer">` at bottom
+6. **免责声明** — `<div class="disclaimer">` at bottom, 含 AI 模型 disclosure 行
 
 ### Format rules
 | Rule | Example |
@@ -182,6 +182,14 @@ tagline: "浮夸版（不对外展示，搜索引擎可见）"
 
 ### Naming
 `_articles/YYYY-MM-DD-hn-keywords.md`
+
+### AI 模型 disclosure
+在免责声明末尾 append 一行，格式固定：
+```
+<br><br><em>本摘要由 AI 模型辅助生成：{provider}/{model}</em>
+```
+{provider}/{model} 必须填实际使用的模型，例如 `google/gemini-2.5-flash` 或 `deepseek/deepseek-v4-flash`。
+禁止编造模型名。如果不知道完整名称，写 `{provider}/{model}` 原文（不替换）。
 
 ## Phase 2.5 — Fact Check (REQUIRED, no skip)
 

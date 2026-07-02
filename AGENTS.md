@@ -58,6 +58,15 @@ Nav pages (`movies.html`, `books.html`, `articles.html`) use `nav: true` in fron
 
 Build env: `JEKYLL_ENV=production` (build), `development` (serve). Persisted gem volume: `bundle_data`.
 
+**GFW workaround**: If `make build` fails with SSL errors to api.github.com, 
+create `.env` file (gitignored) in project root:
+```
+HTTP_PROXY=http://host.docker.internal:64540
+HTTPS_PROXY=http://host.docker.internal:64540
+NO_PROXY=localhost,127.0.0.1,.local
+```
+Docker compose reads `.env` automatically.
+
 ## Commit Style
 Conventional commits in Chinese: `feat:`, `fix:`, `style:`, `docs:`, `refactor:` prefixes. Always build first. `make deploy msg='...'` does build → `git add -A` → commit → push in one step.
 
