@@ -60,6 +60,9 @@ Environment="NO_PROXY=localhost,127.0.0.0/8,::1,10.0.0.0/8,172.16.0.0/12,192.168
 EOF
 
 # ── Configure PATH ──────────────────────────
+cat > "$RUNNER_DIR/.path" <<-EOF
+/home/lax/.cargo/bin:/home/lax/.local/share/mise/installs/ruby/3.2/bin:/home/lax/.local/share/mise/installs/ruby/3.4.7/bin:/home/lax/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/opt/bin
+EOF
 cat > "$RUNNER_DIR/.env" <<-EOF
 LANG=C.utf8
 EOF
