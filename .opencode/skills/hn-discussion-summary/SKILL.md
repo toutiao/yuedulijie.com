@@ -164,7 +164,14 @@ tagline: "浮夸版（不对外展示，搜索引擎可见）"
 1. **原文概要** — context intro, 2-5 paragraphs
    - Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)"
 2. **讨论焦点** — key themes in `###` sections
-   - Cluster mode: blockquotes annotate source `[thread #N]`
+   - 每条 blockquote 引文后紧跟中文翻译行:
+     ```
+     > "English text" — username
+     > （中文翻译）
+     ```
+     - 引文行保留 `— username` attribution，翻译行不加
+     - 中间不空行，属于同一 blockquote
+     - Cluster mode: attribution 后加 `[thread #N]`，翻译行不变
 3. **典型观点一览** — table, columns: 立场 / 用户 / 一句话
 4. **总体情绪** — 1-2 paragraphs
 5. **引用帖子** — markdown table: # / 标题 / URL (auto-generated)
