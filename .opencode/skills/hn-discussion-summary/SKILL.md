@@ -6,7 +6,31 @@ metadata:
   collection: articles
 ---
 
+## Auto Mode Detection
+
+If the command includes `--auto` or env `CI=true`/`GITHUB_ACTIONS=true`, run in **auto mode**:
+no user prompts, auto-decide cluster/single, auto-build, auto-deploy.
+Otherwise run in **interactive mode** (existing flow).
+
 ## Phase 0 — Scan (no URL given)
+
+### Auto mode (--auto or CI)
+
+1. Try reading stories index from hn-fetch cache:
+   - Glob `_data/hn/20*/W*/stories.yaml`
+   - Parse and extract stories list (most recent week's file)
+   - If cache missing → `webfetch` HN best (text format)
+2. Parse stories: title + score + item URL
+3. Filter:
+   - score >= 80
+   - dedup: item id not in `_articles/*.md`
+   - same topic not covered today (grep today's date + keyword)
+4. Sort by score descending
+5. Auto-select top candidate
+6. Report: "Auto-selected: [title] ([score] pts)"
+7. Proceed to Phase 0.5
+
+### Interactive mode (no --auto)
 
 1. `webfetch` https://news.ycombinator.com/best?h=48 (text format)
 2. Parse stories: title + score + item URL
@@ -28,9 +52,22 @@ metadata:
    Input: number / URL / "n" to skip
    ```
 
-## Phase 0.5 — Cluster Detection (auto)
+## Phase 0.5 — Cluster Detection
 
 After post selected or URL given:
+
+### Auto mode (--auto or CI)
+
+1. Derive keyword from selected post title:
+   - Drop leading common words (Claude, new, update, Introducing)
+   - Take first remaining meaningful token
+2. Scan remaining candidates (from Phase 0) for same keyword, score >= 80, not self
+3. If >= 2 related posts → **cluster mode** (include all related posts)
+4. If < 2 → **single post mode**
+5. Report: "Mode: [cluster/single], including N posts"
+
+### Interactive mode (no --auto)
+
 1. `webfetch` HN source page (format: html)
    - Topic from `/best` → `https://news.ycombinator.com/best?h=48`
    - Topic from `/news` → start at `/news`, follow "morelink" until score < 80 or age > 48h (parse "X hours ago" / "X days ago")
@@ -55,14 +92,24 @@ After post selected or URL given:
 
 ## Phase 1 — Fetch + Analyze
 
+Before fetching, try hn-fetch cache for each post:
+
+1. Search cache: glob `_data/hn/20*/W*/<post_id>/comments.yaml`
+2. If found and comments array is non-empty → use cached discussion data (skip webfetch for this post)
+3. If found but comments is empty → cache is stale, fall back to webfetch
+4. If not found → webfetch HN page
+
+Also check `_data/hn/*/<post_id>/article.yaml` for cached article text.
+If fetch_status == 'success': include in Gemini prompt context.
+
 ### Single post mode
-1. `webfetch` HN page (markdown format)
-2. If linked article exists, `webfetch` target page
+1. `webfetch` HN page (markdown format) — skip if valid cache found
+2. If linked article exists, `webfetch` target page — skip if cached article available
 3. Extract: topic clusters / quotes+usernames / unique opinions
 4. For each quote used, record HN comment item id
 
 ### Cluster mode
-1. Main post: top 20 top-level comments
+1. Main post: top 20 top-level comments (from cache or webfetch)
 2. Each related post: top 8 top-level comments
 3. Track `thread_id` per quote (e.g. "[thread 2]")
 4. Merge all comments, group by theme (not by thread)
@@ -165,8 +212,21 @@ After quote verification, scan article body for sensitive terms:
    - 匹配 → 继续
    - 不匹配 → 报错 "date field mismatch", 自动修正为当天日期, 重新构建
 3. `bundle exec jekyll build`
-4. If build fails: report errors, fix, rebuild
-4. If build passes, check article tag:
+4. If build fails: report errors, fix, rebuild (max 1 retry)
+
+### Auto mode (--auto or CI)
+
+5. If build passes, check article tag:
+   - Normal path: `git add -A && git commit -m "feat: HN 自动摘要 $(date +%Y-%m-%d)" && git push`
+   - Flagged path (⚑ sensitive or ⚑ political context):
+     - Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only."
+     - `git add -A && git commit -m "feat: HN 自动摘要 $(date +%Y-%m-%d)" && git push`
+     - Show warning: "⚠ Sensitive article deployed. Review recommended."
+6. No user prompts. Exit 0 on success.
+
+### Interactive mode (no --auto)
+
+5. If build passes, check article tag:
    - Normal path (no tag): ask deploy? → yes → auto-deploy skill
    - Flagged path (⚑ sensitive or ⚑ political context):
      - Show: "⚠ Sensitive topics detected. Extended disclaimer added. Review required."

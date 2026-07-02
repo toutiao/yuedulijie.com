@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      model:
+        description: "Model override (default google/gemini-2.5-flash, use deepseek/deepseek-v4-flash as fallback)"
+        required: false
+        default: "google/gemini-2.5-flash"
 
 permissions:
   contents: write
@@ -53,40 +58,23 @@ jobs:
           key: hn-data-${{ env.PREV_KEY }}-${{ github.run_id }}
           restore-keys: hn-data-${{ env.PREV_KEY }}-
 
-      - name: Fetch HN data
+      - name: Fetch HN data (cache layer)
         run: bundle exec ruby scripts/hn-fetch.rb --best
 
-      - name: Generate articles
+      - name: Generate articles (opencode auto)
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: bundle exec ruby scripts/hn-auto.rb --from-cache
-
-      - name: Build Jekyll
-        id: jekyll_build
-        run: bundle exec jekyll build
-        continue-on-error: true
-
-      - name: Revert on build failure
-        if: steps.jekyll_build.outcome == 'failure'
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          git checkout -- _articles/
-          echo "Build FAILED, reverted article changes"
-          exit 1
-
-      - name: Commit and push articles
-        if: steps.jekyll_build.outcome == 'success'
-        run: |
-          STATUS=$(git status --porcelain _articles/)
-          if [ -z "$STATUS" ]; then
-            echo "No new articles to commit"
-            exit 0
-          fi
-          git add -A _articles/
-          git commit -m "feat: HN 自动摘要 $(date -u +%Y-%m-%d)"
-          git push origin HEAD || (
-            git pull --rebase origin HEAD && git push origin HEAD
-          )
-          echo "Push OK"
+          # Clean up any orphaned _articles/ from previous failed run
+          git checkout -- _articles/ 2>/dev/null || true
+          git clean -fd _articles/ 2>/dev/null || true
+          MODEL='${{ inputs.model }}'
+          if [ -z "$MODEL" ]; then MODEL='google/gemini-2.5-flash'; fi
+          opencode run '/hn --auto' --dir . \
+            --dangerously-skip-permissions \
+            --model "$MODEL" \
+            --print-logs 2>&1
 
       - name: Save current week cache
         # NOTE: 上周 cache entry 不显式 save，依赖 GitHub 7天无活动淘汰。
