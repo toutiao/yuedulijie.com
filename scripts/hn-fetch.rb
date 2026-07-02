@@ -10,6 +10,7 @@
 
 require 'net/http'
 require 'uri'
+require 'json'
 require 'yaml'
 require 'nokogiri'
 require 'reverse_markdown'
@@ -17,10 +18,100 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
-require 'net/http'
-require 'uri'
 
 RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
+
+$stdout.sync = true
+
+CACHE_DIR = '_data/hn'
+CACHE_TTL = 3600
+SCORE_THRESHOLD = 80
+MAX_DEFAULT = 15
+COMMENT_THRESHOLD = 0
+COMMENT_CAP = 100
+ARTICLE_TRUNCATE = 8000
+HN_API_BASE = 'https://hacker-news.firebaseio.com/v0'
+$hn_http = nil
+
+def hn_http
+  $hn_http ||= begin
+    uri = URI(HN_API_BASE)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.open_timeout = 10
+    http.read_timeout = 15
+    http.start
+    http
+  end
+end
+
+def fetch_via_api(endpoint)
+  resp = hn_http.get("/v0/#{endpoint}")
+  body = JSON.parse(resp.body)
+  [resp.code.to_i, body]
+rescue => e
+  raise "API fetch failed #{endpoint}: #{e.message}"
+end
+
+def fetch_stories
+  _, ids = fetch_via_api('beststories.json')
+  ids.first(MAX_DEFAULT * 2).map do |id|
+    _, item = fetch_via_api("item/#{id}.json")
+    next unless item && item['type'] == 'story' && item['score'] && item['score'] >= SCORE_THRESHOLD
+    {
+      'id' => id.to_s,
+      'title' => item['title'] || '',
+      'url' => item['url'],
+      'hn_url' => "https://news.ycombinator.com/item?id=#{id}",
+      'score' => item['score'],
+      'author' => item['by'] || '',
+    }
+  end.compact.first(MAX_DEFAULT)
+end
+
+def parse_comments(ids)
+  comments = []
+  ids.each do |cid|
+    _, c = fetch_via_api("item/#{cid}.json")
+    next unless c && c['type'] == 'comment' && c['text'] && !c['text'].empty?
+    text = Nokogiri::HTML(c['text']).text.strip
+    next if text.empty?
+    comments << {
+      'id' => cid.to_s,
+      'parent_id' => c['parent'].to_s,
+      'author' => c['by'] || 'anonymous',
+      'text' => text,
+      'score' => c['score'] || 0,
+      'posted_at' => c['time'] ? Time.at(c['time']).utc.iso8601 : nil,
+    }
+  end
+  comments
+end
+
+def fetch_discussion(post_id)
+  _, item = fetch_via_api("item/#{post_id}.json")
+  return nil unless item
+
+  comments = item['kids'] ? parse_comments(item['kids']) : []
+  active = comments.select { |c| c['score'] >= COMMENT_THRESHOLD }
+  if active.length > 20
+    active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
+  end
+
+  DiscussionResult.new(
+    item['title'] || '',
+    item['url'],
+    item['score'] || 0,
+    item['by'] || '',
+    item['time'] ? Time.at(item['time']).utc.iso8601 : nil,
+    active,
+    comments.length,
+  )
+end
+
+DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments, :raw_comment_count)
+
+# ── Browser fetch (for article JS rendering) ──
 
 def fetch_with_browser(url, js_render: false)
   uri = URI("#{RENDERER_URL}/render")
@@ -31,168 +122,6 @@ def fetch_with_browser(url, js_render: false)
   [resp.code.to_i, resp.body.force_encoding('UTF-8')]
 rescue => e
   raise "Browser fetch failed for #{url}: #{e.message}"
-end
-
-$stdout.sync = true
-
-CACHE_DIR = '_data/hn'
-CACHE_TTL = 3600
-HN_BEST_URL = 'https://news.ycombinator.com/best'
-SCORE_THRESHOLD = 80
-MAX_DEFAULT = 15
-COMMENT_THRESHOLD = 0
-COMMENT_CAP = 100
-DISCUSSION_TRUNCATE = 80_000
-ARTICLE_TRUNCATE = 8000
-
-USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0',
-]
-
-# ── HTTP ──
-
-def fetch(uri_str, max_retries: 2, timeout: 30)
-  uri = URI(uri_str)
-  retries = 0
-  begin
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = uri.scheme == 'https'
-    http.open_timeout = timeout
-    http.read_timeout = timeout
-    request = Net::HTTP::Get.new(uri.request_uri)
-    request['User-Agent'] = USER_AGENTS.sample
-    request['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    request['Accept-Language'] = 'en-US,en;q=0.9'
-    request['Accept-Encoding'] = 'gzip, deflate, br'
-    request['DNT'] = '1'
-    request['Connection'] = 'keep-alive'
-    request['Upgrade-Insecure-Requests'] = '1'
-    response = http.request(request)
-    [response.code.to_i, response.body.force_encoding('UTF-8')]
-  rescue Net::ReadTimeout, Net::OpenTimeout,
-         Errno::ECONNREFUSED, Errno::ECONNRESET => e
-    retries += 1
-    if retries <= max_retries
-      sleep retries * 3
-      retry
-    end
-    raise "Failed to fetch #{uri_str}: #{e.message}"
-  end
-end
-
-# ── HN best page parser ──
-
-def parse_best_page(html)
-  doc = Nokogiri::HTML(html)
-  stories = []
-
-  doc.css('tr.athing').each do |row|
-    id = row['id']
-    next unless id
-
-    link = row.at_css('.titleline a') || row.at_css('td.title a.storylink')
-    next unless link
-
-    title = link.text.strip
-    raw_url = link['href']
-    url = raw_url.match?(/\Ahttps?:\/\//) ? raw_url : nil
-
-    score = 0
-    author = nil
-    sib = row.next_element
-    while sib
-      score_el = sib.at_css('.score')
-      if score_el
-        m = score_el.text.match(/(\d+)/)
-        score = m[1].to_i if m
-      end
-      user_el = sib.at_css('.hnuser')
-      author = user_el.text.strip if user_el
-      break if score_el
-      sib = sib.next_element
-    end
-
-    stories << {
-      'id' => id,
-      'title' => title,
-      'url' => url,
-      'hn_url' => "https://news.ycombinator.com/item?id=#{id}",
-      'score' => score,
-      'author' => author
-    }
-  end
-
-  stories
-end
-
-# ── HN discussion page parser ──
-
-DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments, :raw_comment_count)
-
-def parse_discussion_page(html, hn_url)
-  doc = Nokogiri::HTML(html)
-  post_id = hn_url[/\d+/]
-
-  title_el = doc.at_css('title')
-  post_title = title_el ? title_el.text.strip.sub(/\A[HN: ]+/, '').strip : 'HN Discussion'
-
-  posted_at = nil
-  age_el = doc.at_css('.age')
-  posted_at = age_el['title'] if age_el && age_el['title']
-
-  story_link = doc.at_css('.titleline a')
-  post_url = story_link ? story_link['href'] : nil
-  post_url = nil unless post_url&.match?(/\Ahttps?:\/\//)
-
-  author_el = doc.at_css('.hnuser')
-  author = author_el ? author_el.text.strip : nil
-
-  score = 0
-  score_el = doc.at_css('.score')
-  score = score_el.text[/\d+/].to_i if score_el
-
-  comments = []
-  doc.css('tr.athing.comtr').each do |row|
-    cid = row['id']
-    next unless cid
-
-    user_el = row.at_css('.hnuser')
-    username = user_el&.text&.strip || 'anonymous'
-
-    cscore = 0
-    cscore_el = row.at_css('.score')
-    cscore = cscore_el.text[/\d+/].to_i if cscore_el
-
-    text_el = row.at_css('.commtext')
-    text = text_el&.text&.strip || ''
-    next if text.empty?
-
-    c_age_el = row.at_css('.age')
-    c_posted_at = c_age_el&.text&.strip
-
-    ind_el = row.at_css('.ind img')
-    parent_id = ind_el && ind_el['width'] ? post_id : nil
-
-    comments << {
-      'id' => cid,
-      'parent_id' => parent_id,
-      'author' => username,
-      'text' => text,
-      'score' => cscore,
-      'posted_at' => c_posted_at
-    }
-  end
-
-  active = comments.select { |c| c['score'] >= COMMENT_THRESHOLD }
-  if active.length > 20
-    active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
-  end
-
-  DiscussionResult.new(post_title, post_url, score, author, posted_at, active, comments.length)
 end
 
 # ── Article extraction (nokogiri + reverse_markdown) ──
@@ -335,29 +264,13 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     return [:cached, { 'post' => cached, 'comments' => comments, 'article' => article }, nil]
   end
 
-  begin
-    status_code, html = fetch_with_browser(hn_url)
-  rescue => e
-    return [:error, nil, "fetch discussion failed: #{e.message}"]
-  end
-
-  disc = parse_discussion_page(html, hn_url)
-
-  if disc.raw_comment_count == 0 && known_meta && known_meta['score'].to_i >= SCORE_THRESHOLD
-    if status_code == 429 || html.match?(/Sorry/)
-      sleep 30
-      _, html = fetch_with_browser(hn_url)
-      disc = parse_discussion_page(html, hn_url)
-    end
-  end
-
-  if disc.raw_comment_count == 0 && !force
+  disc = fetch_discussion(post_id)
+  unless disc
     cached_comments = load_cached_comments(post_id)
     if cached_comments && cached_comments['comments']&.any?
-      cached_post = load_cached_post(post_id)
-      cached_article = load_cached_article(post_id)
-      return [:cached, { 'post' => cached_post, 'comments' => cached_comments, 'article' => cached_article }, nil]
+      return [:cached, { 'post' => load_cached_post(post_id), 'comments' => cached_comments, 'article' => load_cached_article(post_id) }, nil]
     end
+    return [:error, nil, "failed to fetch discussion for #{post_id}"]
   end
 
   post_data = {
@@ -371,13 +284,11 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     'fetched_at' => Time.now.utc.iso8601,
     'article_url' => disc.post_url,
     'article_fetch_status' => nil,
-    'raw_comment_count' => disc.raw_comment_count
+    'raw_comment_count' => disc.raw_comment_count,
   }
 
   article_url = disc.post_url
-  if article_url.nil? && known_meta
-    article_url = known_meta['url']
-  end
+  article_url = known_meta['url'] if article_url.nil? && known_meta
 
   article_data = extract_article(article_url)
   post_data['article_fetch_status'] = article_data['fetch_status']
@@ -477,34 +388,27 @@ def run
     return
   end
 
-  puts "\n[1/3] Fetching HN best page..."
-  _, html = fetch_with_browser(HN_BEST_URL)
-  stories = parse_best_page(html)
+  puts "\n[1/3] Fetching HN best page (API)..."
+  stories = fetch_stories
   puts "  #{stories.length} stories"
   write_stories_index(stories, options[:output] || CACHE_DIR)
 
-  stories.sort_by { |s| -s['score'] }.first(10).each do |s|
+  stories.first(10).each do |s|
     url_tag = s['url'] ? ' [link]' : ' [text]'
     puts "    [#{s['score']}] #{s['title'][0, 70]}#{url_tag}"
   end
 
-  candidates = stories
-    .select { |s| s['score'] >= SCORE_THRESHOLD }
-    .sort_by { |s| -s['score'] }
-    .first(options[:max])
+  if stories.length > 10
+    puts "    ... and #{stories.length - 10} more"
+  end
 
-  puts "\n[2/3] Candidates (#{candidates.length}, score >= #{SCORE_THRESHOLD}):"
-  candidates.each { |s| puts "  [#{s['score']}] #{s['title'][0, 70]}" }
-
-  puts "\n[3/3] Fetching discussions..."
+  puts "\n[2/3] Fetching discussions..."
   fetched = 0
   cached = 0
   articles_ok = 0
   errors = 0
 
-  candidates.each_with_index do |story, i|
-    sleep rand(2.0..5.0) if i > 0
-
+  stories.each_with_index do |story, i|
     status, result, err = fetch_and_cache(
       story['hn_url'],
       known_meta: story,
@@ -527,6 +431,8 @@ def run
 
   puts "\n---"
   puts "Summary: #{fetched} fetched, #{cached} cached, #{articles_ok} articles, #{errors} errors"
+ensure
+  $hn_http&.finish rescue nil
 end
 
 run
