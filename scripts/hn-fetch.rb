@@ -323,6 +323,15 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     end
   end
 
+  if disc.raw_comment_count == 0 && !force
+    cached_comments = load_cached_comments(post_id)
+    if cached_comments && cached_comments['comments']&.any?
+      cached_post = load_cached_post(post_id)
+      cached_article = load_cached_article(post_id)
+      return [:cached, { 'post' => cached_post, 'comments' => cached_comments, 'article' => cached_article }, nil]
+    end
+  end
+
   post_data = {
     'id' => post_id,
     'title' => disc.post_title,
