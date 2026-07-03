@@ -91,6 +91,13 @@ jobs:
             --dangerously-skip-permissions \
             --model "$MODEL" --print-logs 2>&1
 
+      - name: Show changes
+        run: |
+          echo "=== Articles ==="
+          ls -la _articles/ 2>/dev/null | tail -5 || echo "(empty)"
+          echo "=== Git status ==="
+          git status --short -- _articles/ 2>/dev/null || true
+
       - name: Validate Jekyll build
         run: bundle exec jekyll build
 
