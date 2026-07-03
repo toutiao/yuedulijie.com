@@ -6,20 +6,17 @@ runs:
     - id: weeks
       shell: bash
       run: |
-        CUR_WK=W$(date -u +%V)
-        PREV_DATE=$(date -u -d '7 days ago')
-        PREV_WK=W$(date -u -d "$PREV_DATE" +%V)
         echo "cur_yr=$(date -u +%G)" >> $GITHUB_OUTPUT
-        echo "cur_wk=$CUR_WK" >> $GITHUB_OUTPUT
-        echo "prev_yr=$(date -u -d "$PREV_DATE" +%G)" >> $GITHUB_OUTPUT
-        echo "prev_wk=$PREV_WK" >> $GITHUB_OUTPUT
+        echo "cur_wk=W$(date -u +%V)" >> $GITHUB_OUTPUT
+        echo "prev_yr=$(date -u -d '7 days ago' +%G)" >> $GITHUB_OUTPUT
+        echo "prev_wk=W$(date -u -d '7 days ago' +%V)" >> $GITHUB_OUTPUT
     - uses: actions/cache/restore@v4
       with:
         path: _data/hn/${{ steps.weeks.outputs.cur_yr }}/${{ steps.weeks.outputs.cur_wk }}
-        key: hn-data-${{ steps.weeks.outputs.cur_yr }}${{ steps.weeks.outputs.cur_wk }}-${{ github.run_id }}
-        restore-keys: hn-data-${{ steps.weeks.outputs.cur_yr }}${{ steps.weeks.outputs.cur_wk }}-
+        key: hn-data-${{ steps.weeks.outputs.cur_yr }}-${{ steps.weeks.outputs.cur_wk }}-${{ github.run_id }}
+        restore-keys: hn-data-${{ steps.weeks.outputs.cur_yr }}-${{ steps.weeks.outputs.cur_wk }}-
     - uses: actions/cache/restore@v4
       with:
         path: _data/hn/${{ steps.weeks.outputs.prev_yr }}/${{ steps.weeks.outputs.prev_wk }}
-        key: hn-data-${{ steps.weeks.outputs.prev_yr }}${{ steps.weeks.outputs.prev_wk }}-${{ github.run_id }}
-        restore-keys: hn-data-${{ steps.weeks.outputs.prev_yr }}${{ steps.weeks.outputs.prev_wk }}-
+        key: hn-data-${{ steps.weeks.outputs.prev_yr }}-${{ steps.weeks.outputs.prev_wk }}-${{ github.run_id }}
+        restore-keys: hn-data-${{ steps.weeks.outputs.prev_yr }}-${{ steps.weeks.outputs.prev_wk }}-
