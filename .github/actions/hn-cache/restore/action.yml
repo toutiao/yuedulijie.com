@@ -13,10 +13,10 @@ runs:
     - uses: actions/cache/restore@v4
       with:
         path: _data/hn/${{ steps.weeks.outputs.cur_yr }}/${{ steps.weeks.outputs.cur_wk }}
-        key: hn-data-${{ steps.weeks.outputs.cur_yr }}-${{ steps.weeks.outputs.cur_wk }}-${{ github.run_id }}
-        restore-keys: hn-data-${{ steps.weeks.outputs.cur_yr }}-${{ steps.weeks.outputs.cur_wk }}-
+        key: hn-data-${{ steps.weeks.outputs.cur_yr }}${{ steps.weeks.outputs.cur_wk }}-${{ github.run_id }}
+        restore-keys: hn-data-${{ steps.weeks.outputs.cur_yr }}${{ steps.weeks.outputs.cur_wk }}-
     - uses: actions/cache/restore@v4
       with:
         path: _data/hn/${{ steps.weeks.outputs.prev_yr }}/${{ steps.weeks.outputs.prev_wk }}
-        key: hn-data-${{ steps.weeks.outputs.prev_yr }}-${{ steps.weeks.outputs.prev_wk }}-${{ github.run_id }}
-        restore-keys: hn-data-${{ steps.weeks.outputs.prev_yr }}-${{ steps.weeks.outputs.prev_wk }}-
+        key: hn-data-${{ steps.weeks.outputs.prev_yr }}${{ steps.weeks.outputs.prev_wk }}-${{ github.run_id }}
+        restore-keys: hn-data-${{ steps.weeks.outputs.prev_yr }}${{ steps.weeks.outputs.prev_wk }}-
