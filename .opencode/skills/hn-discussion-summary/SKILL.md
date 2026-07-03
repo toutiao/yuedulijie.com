@@ -24,16 +24,18 @@ Stories must pass all:
 - same topic not covered today (grep today's date + keyword in existing articles)
 
 ### Auto mode
-1. Source: `webfetch` https://news.ycombinator.com/best?h=48 (text format)
-2. Parse: title + score + item URL
-3. Apply filters (All modes section)
-4. Sort by score descending
-5. Auto-select top candidate
-6. Report: "Auto-selected: [title] ([score] pts)"
-7. Proceed to Phase 0.5
+1. Source: Read cached stories from `_data/hn/`
+   - `glob _data/hn/*/W*/stories.yaml` → pick newest week
+   - `read` file → extract `stories` array (each has: id, title, score, hn_url, author, descendants)
+2. Apply filters (All modes section)
+3. Sort by score descending
+4. Auto-select top candidate
+5. Report: "Auto-selected: [title] ([score] pts)"
+6. Proceed to Phase 0.5
+7. Fallback: if no cached data, `webfetch` https://news.ycombinator.com/best?h=48
 
 ### Interactive mode
-1. `webfetch` https://news.ycombinator.com/best?h=48 (text format)
+1. Source: `webfetch` https://news.ycombinator.com/best?h=48 (text format)
 2. Parse stories: title + score + item URL
 3. Apply filters (All modes section)
 4. For each candidate, detect political context: title matches political keywords (election, protest, war, sanction, human rights, etc.)
@@ -86,17 +88,27 @@ From selected post title: drop leading common words (Claude, new, update, Introd
 
 ### Cache strategy
 
-Always `webfetch` HN page and linked article. No cache fallback.
+Prefer cached data from `_data/hn/`. Fallback to `webfetch` only when cache unavailable.
+
+Cache file locations (replace `YYYY`/`WNN`/`{id}` as needed):
+| Data | Path | Key fields |
+|------|------|-----------|
+| Post metadata | `_data/hn/YYYY/WNN/{id}/post.yaml` | title, score, author, posted_at, raw_comment_count |
+| Comments | `_data/hn/YYYY/WNN/{id}/comments.yaml` | comments[].{id, author, text, score} |
+| Article | `_data/hn/YYYY/WNN/{id}/article.yaml` | title, fetch_status, content |
+
+Use `glob _data/hn/*/W*/` to find the week dir, then read files for the selected story id.
 
 ### Single post mode
-1. `webfetch` HN page (markdown)
-2. If linked article exists, `webfetch` target page
+1. Read `_data/hn/*/W*/{id}/comments.yaml` → extract quotes + usernames
+2. If `article.fetch_status == 'success'`, read `article.yaml` → use `content` field
+   - Fallback: `webfetch` linked article URL
 3. Extract: topic clusters / quotes+usernames / unique opinions
 4. Record HN comment item id for each quote used
 
 ### Cluster mode
-1. Main post: top 20 top-level comments (webfetch)
-2. Each related post: top 8 top-level comments
+1. Main post: read cached comments, top 20 by score
+2. Each related post: read cached comments, top 8 by score
 3. Track `thread_id` per quote (e.g. "[thread 2]")
 4. Merge all comments, group by theme (not by thread)
 
