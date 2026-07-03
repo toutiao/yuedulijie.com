@@ -89,7 +89,7 @@ jobs:
           fi
           opencode run "$HN_CMD" --dir . \
             --dangerously-skip-permissions \
-            --model "$MODEL" --print-logs 2>&1 | sed '/^timestamp=/d'
+            --model "$MODEL" --print-logs 2>&1
 
       - name: Validate Jekyll build
         run: bundle exec jekyll build
