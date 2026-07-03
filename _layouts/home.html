@@ -13,8 +13,6 @@ layout: default
   {%- if site.essays.size > 0 -%}{%- capture p -%}{{ site.essays.size }} 篇随笔{%- endcapture -%}{%- assign parts = parts | push: p -%}{%- endif -%}
   <p class="summary-line">{{ parts | join: " · " }}</p>
 
-  <section class="section-overview">
-
   {%- assign all_items = "" | split: "" -%}
   {%- for item in site.movies -%}{%- assign all_items = all_items | push: item -%}{%- endfor -%}
   {%- for item in site.books -%}{%- assign all_items = all_items | push: item -%}{%- endfor -%}
@@ -22,9 +20,11 @@ layout: default
   {%- for item in site.essays -%}{%- assign all_items = all_items | push: item -%}{%- endfor -%}
   {%- assign sorted_all = all_items | sort: "date" | reverse -%}
 
+  <section class="section-overview">
+
   {%- for post in sorted_all limit: 2 -%}
     <div class="card">
-      <div class="card-header"><h3>{% if post.collection == "movies" %}电影{% elsif post.collection == "books" %}书籍{% elsif post.collection == "articles" %}文章{% elsif post.collection == "essays" %}随笔{% endif %}</h3></div>
+      <div class="card-header"><h3>{% if post.collection == "movies" %}电影{% elsif post.collection == "books" %}书籍{% elsif post.collection == "articles" %}文章{% elsif post.collection == "essays" %}随笔{% endif %}</h3><span class="card-date">{{ post.date | date: "%Y-%m-%d" }}</span></div>
       <a class="latest-title" href="{{ post.url | relative_url }}"{% if post.tagline %} title="{{ post.tagline }}"{% endif %}>{{ post.title }}</a>
       {%- if post.excerpt -%}<p class="excerpt">{{ post.excerpt | strip_newlines | truncate: 120 }}</p>{%- endif -%}
       <div class="card-footer"><a href="/{{ post.collection }}.html">→</a></div>
@@ -36,14 +36,7 @@ layout: default
   <section class="section-recent">
     <h2>最近更新</h2>
 
-    {% assign all_items = "" | split: "" %}
-    {% for item in site.movies %}{% assign all_items = all_items | push: item %}{% endfor %}
-    {% for item in site.books %}{% assign all_items = all_items | push: item %}{% endfor %}
-    {% for item in site.articles %}{% assign all_items = all_items | push: item %}{% endfor %}
-    {% for item in site.essays %}{% assign all_items = all_items | push: item %}{% endfor %}
-    {% assign sorted = all_items | sort: "date" | reverse %}
-
-    {% for post in sorted limit: 20 %}
+    {% for post in sorted_all limit: 20 %}
     <div class="recent-item">
       <span class="recent-date">{{ post.date | date: "%Y-%m-%d" }}</span>
       <span class="tag tag-{{ post.collection }}">

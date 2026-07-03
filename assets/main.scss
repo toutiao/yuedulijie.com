@@ -318,6 +318,11 @@ main.container.home {
       display: flex;
       flex-direction: column;
       gap: 0.3em;
+      transition: box-shadow 0.3s ease;
+
+      &:hover {
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      }
 
       .card-header {
         display: flex;
@@ -326,7 +331,7 @@ main.container.home {
         margin-bottom: 0.25em;
 
         h3 { font-size: 1em; font-weight: 400; color: #888; margin: 0; }
-        .count { font-size: 1.2em; color: #ccc; font-weight: 200; }
+        .card-date { font-size: 0.8em; color: #bbb; }
       }
 
       .latest-title {
@@ -349,22 +354,25 @@ main.container.home {
         margin-top: auto;
         padding-top: 0.5em;
         font-size: 0.8em;
+        text-align: right;
 
-        a { color: #bbb; }
+        a { color: #ccc; }
         a:hover { color: #666; }
       }
     }
   }
 
   .section-recent {
-    margin: 3em 0;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 1.5em;
+    margin: 1.5em 0 3em;
 
     h2 {
-      font-size: 1em;
-      font-weight: 400;
-      color: #999;
-      text-align: left;
-      margin: 2em 0 1em;
+      font-size: 0.85em;
+      font-weight: 500;
+      color: #bbb;
+      letter-spacing: 0.05em;
+      margin: 0 0 1em;
     }
 
     .recent-item {
