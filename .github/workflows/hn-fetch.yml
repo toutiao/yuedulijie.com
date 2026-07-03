@@ -13,21 +13,9 @@ jobs:
       - name: Install Ruby deps
         run: gem install nokogiri reverse_markdown 2>&1 | tail -3
 
-      - name: Set cache key
-        run: echo "CACHE_KEY=hn-data-$(date -u +%Y-W%V)-${{ github.run_id }}" >> $GITHUB_ENV
-
-      - name: Restore previous cache (avoid refetching)
-        uses: actions/cache/restore@v4
-        with:
-          path: _data/hn
-          key: ${{ env.CACHE_KEY }}
-          restore-keys: hn-data-$(date -u +%Y-W%V)-
+      - uses: ./.github/actions/hn-cache/restore
 
       - name: Fetch HN data
         run: ruby scripts/hn-fetch.rb --best --max 15
 
-      - name: Save cache
-        uses: actions/cache/save@v4
-        with:
-          path: _data/hn
-          key: ${{ env.CACHE_KEY }}
+      - uses: ./.github/actions/hn-cache/save

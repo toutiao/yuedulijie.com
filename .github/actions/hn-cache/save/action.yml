@@ -1,0 +1,16 @@
+name: 'Save HN data cache'
+description: 'Save current week HN data directory to GH Actions cache'
+runs:
+  using: 'composite'
+  steps:
+    - id: info
+      shell: bash
+      run: |
+        YR=$(date -u +%G)
+        WK=W$(date -u +%V)
+        echo "dir=_data/hn/$YR/$WK" >> $GITHUB_OUTPUT
+        echo "key=hn-data-$YR$WK-${{ github.run_id }}" >> $GITHUB_OUTPUT
+    - uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.info.outputs.dir }}
+        key: ${{ steps.info.outputs.key }}
