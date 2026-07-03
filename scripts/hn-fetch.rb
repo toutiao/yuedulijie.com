@@ -24,13 +24,13 @@ RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 $stdout.sync = true
 
 CACHE_DIR = '_data/hn'
-CACHE_TTL = 3600
 SCORE_THRESHOLD = 80
-MAX_DEFAULT = 15
+MAX_DEFAULT = 30
 COMMENT_THRESHOLD = 0
 COMMENT_CAP = 100
 ARTICLE_TRUNCATE = 8000
 HN_API_BASE = 'https://hacker-news.firebaseio.com/v0'
+ALGOLIA_API = 'https://hn.algolia.com/api/v1'
 $hn_http = nil
 
 def hn_http
@@ -53,7 +53,33 @@ rescue => e
   raise "API fetch failed #{endpoint}: #{e.message}"
 end
 
-def fetch_stories
+def algolia_get(endpoint)
+  uri = URI("#{ALGOLIA_API}/#{endpoint}")
+  resp = Net::HTTP.get_response(uri)
+  JSON.parse(resp.body)
+rescue => e
+  warn "Algolia API error #{endpoint}: #{e.message}" if $stderr.tty?
+  nil
+end
+
+def fetch_stories_algolia
+  cutoff = (Time.now.to_i - 48 * 3600).to_s
+  data = algolia_get("search?tags=story&hitsPerPage=#{MAX_DEFAULT}&numericFilters=points>=80,created_at_i>=#{cutoff}")
+  return nil unless data && data['hits']
+  data['hits'].map { |h|
+    {
+      'id' => h['objectID'],
+      'title' => h['title'] || '',
+      'url' => h['url'],
+      'hn_url' => "https://news.ycombinator.com/item?id=#{h['objectID']}",
+      'score' => h['points'] || 0,
+      'author' => h['author'] || '',
+      'descendants' => h['num_comments'] || 0,
+    }
+  }
+end
+
+def fetch_stories_firebase
   _, ids = fetch_via_api('beststories.json')
   ids.first(MAX_DEFAULT * 2).map do |id|
     _, item = fetch_via_api("item/#{id}.json")
@@ -70,7 +96,43 @@ def fetch_stories
   end.compact.first(MAX_DEFAULT)
 end
 
-def parse_comments(ids)
+def fetch_stories
+  fetch_stories_algolia || fetch_stories_firebase
+end
+
+def flatten_comments(children)
+  (children || []).select { |c| c['type'] == 'comment' }.flat_map { |c|
+    [{
+      'id' => c['id'].to_s,
+      'parent_id' => (c['parent_id'] || '0').to_s,
+      'author' => c['author'] || 'anonymous',
+      'text' => c['text'] || '',
+      'score' => c['points'] || 0,
+      'posted_at' => c['created_at'] ? Time.parse(c['created_at']).utc.iso8601 : nil,
+    }] + flatten_comments(c['children'])
+  }
+end
+
+def fetch_discussion_algolia(post_id)
+  data = algolia_get("items/#{post_id}")
+  return nil unless data
+  comments = flatten_comments(data['children'])
+  active = comments.select { |c| c['score'] >= COMMENT_THRESHOLD }
+  if active.length > 20
+    active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
+  end
+  DiscussionResult.new(
+    data['title'] || '',
+    data['url'],
+    data['points'] || 0,
+    data['author'] || '',
+    data['created_at'] ? Time.parse(data['created_at']).utc.iso8601 : nil,
+    active,
+    comments.length,
+  )
+end
+
+def parse_comments_firebase(ids)
   comments = []
   ids.each do |cid|
     _, c = fetch_via_api("item/#{cid}.json")
@@ -89,11 +151,11 @@ def parse_comments(ids)
   comments
 end
 
-def fetch_discussion(post_id)
+def fetch_discussion_firebase(post_id)
   _, item = fetch_via_api("item/#{post_id}.json")
   return nil unless item
 
-  comments = item['kids'] ? parse_comments(item['kids']) : []
+  comments = item['kids'] ? parse_comments_firebase(item['kids']) : []
   active = comments.select { |c| c['score'] >= COMMENT_THRESHOLD }
   if active.length > 20
     active = active.sort_by { |c| -c['score'] }.first(COMMENT_CAP)
@@ -108,6 +170,10 @@ def fetch_discussion(post_id)
     active,
     comments.length,
   )
+end
+
+def fetch_discussion(post_id)
+  fetch_discussion_algolia(post_id) || fetch_discussion_firebase(post_id)
 end
 
 DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments, :raw_comment_count)
@@ -206,14 +272,9 @@ def cache_fresh?(post_id)
   return false unless dir
   post_file = File.join(dir, 'post.yaml')
   return false unless File.exist?(post_file)
-  begin
-    post = YAML.safe_load_file(post_file, permitted_classes: [Time])
-    ts = post['fetched_at']
-    return false unless ts
-    (Time.now - Time.parse(ts)) < CACHE_TTL
-  rescue
-    false
-  end
+  YAML.safe_load_file(post_file, permitted_classes: [Time])
+rescue
+  false
 end
 
 def load_cached_post(post_id)
@@ -266,7 +327,7 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     if cached_post && known_meta && known_meta['descendants'] == cached_post['raw_comment_count']
       return [:cached, { 'post' => cached_post, 'comments' => comments, 'article' => article }, nil]
     end
-    return [:cached, { 'post' => cached_post, 'comments' => comments, 'article' => article }, nil]
+    # descendants 变化 → 落盘重抓
   end
 
   disc = fetch_discussion(post_id)
