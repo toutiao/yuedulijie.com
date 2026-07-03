@@ -324,39 +324,33 @@ main.container.home {
         box-shadow: 0 2px 12px rgba(0,0,0,0.06);
       }
 
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        margin-bottom: 0.25em;
-
-        h3 { font-size: 1em; font-weight: 400; color: #888; margin: 0; }
-        .card-date { font-size: 0.8em; color: #bbb; }
-      }
-
       .latest-title {
         font-size: 1.05em;
-        margin: 0.5em 0 0.2em;
+        margin: 0;
         line-height: 1.4;
-        color: #333;
+        color: #1a1a1a;
 
         &:hover { color: #aaa; }
       }
 
       .excerpt {
         font-size: 0.85em;
-        color: #888;
+        color: #555;
         line-height: 1.6;
-        margin: 0.2em 0;
+        margin: 0;
       }
 
       .card-footer {
         margin-top: auto;
-        padding-top: 0.5em;
-        font-size: 0.8em;
-        text-align: right;
+        padding-top: 0.6em;
+        display: flex;
+        gap: 0.6em;
+        align-items: baseline;
+        font-size: 0.75em;
 
-        a { color: #ccc; }
+        .card-tag { color: #bbb; }
+        .card-date { color: #ccc; }
+        a { margin-left: auto; color: #ddd; }
         a:hover { color: #666; }
       }
     }
