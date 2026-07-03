@@ -126,10 +126,13 @@ layout: post
 title: "Topic — HN discussion digest"
 date: $(date +%Y-%m-%d)
 categories: [articles]
-excerpt: "一句话摘要（1-2 句，~80 字）"
-tagline: "浮夸版（不对外展示，搜索引擎可见）"
+excerpt: >-
+  一句话摘要（1-2 句，~80 字）
+tagline: >-
+  浮夸版（不对外展示，搜索引擎可见）
 ---
 ```
+⚠ `excerpt` / `tagline` 使用 YAML block scalar `>-`，内容中的 ASCII 双引号 `"` 会被 YAML 解析为字符串终止。若文本内需要引号，用中文书名号《》或转义 `\"`。
 
 ⚠ `date` must be auto-filled via `$(date +%Y-%m-%d)`. Never enter manually.
 

@@ -3,8 +3,10 @@ layout: post
 title: "Android Developer Verification — HN discussion digest"
 date: 2026-07-03
 categories: [articles]
-excerpt: "F-Droid 将 Google 的 Android Developer Verification 称为"恶意软件"——一个拥有 root 权限、无法卸载、通过 Play Protect 传播的系统进程。HN 社区展开激烈辩论：这是合理的反垄断担忧，还是对安全措施的过度反应？"
-tagline: "Google 在 40 亿台设备上预装了一个"恶意软件"——F-Droid 说这是字面意思。"
+excerpt: >-
+  F-Droid 将 Google 的 Android Developer Verification 称为"恶意软件"——一个拥有 root 权限、无法卸载、通过 Play Protect 传播的系统进程。HN 社区展开激烈辩论：这是合理的反垄断担忧，还是对安全措施的过度反应？
+tagline: >-
+  Google 在 40 亿台设备上预装了一个"恶意软件"——F-Droid 说这是字面意思。
 ---
 
 ## 原文概要
