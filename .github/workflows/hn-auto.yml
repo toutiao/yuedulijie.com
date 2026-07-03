@@ -65,6 +65,31 @@ jobs:
 
       - uses: ./.github/actions/hn-cache/restore
 
+      - name: Check API keys
+        env:
+          GOOGLE_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          echo "=== Google Gemini ==="
+          if [ -n "$GOOGLE_KEY" ]; then
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash?key=$GOOGLE_KEY")
+            echo "  status: $CODE"
+            [ "$CODE" = "200" ] && echo "  OK" || echo "  WARN: HTTP $CODE"
+          else
+            echo "  no key"
+          fi
+          echo "=== DeepSeek ==="
+          if [ -n "$DEEPSEEK_KEY" ]; then
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              https://api.deepseek.com/v1/models \
+              -H "Authorization: Bearer $DEEPSEEK_KEY")
+            echo "  status: $CODE"
+            [ "$CODE" = "200" ] && echo "  OK" || echo "  WARN: HTTP $CODE"
+          else
+            echo "  no key"
+          fi
+
       - name: Generate articles (opencode auto)
         env:
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -74,7 +99,7 @@ jobs:
           git checkout -- _articles/ 2>/dev/null || true
           git clean -fd _articles/ 2>/dev/null || true
           MODEL='${{ inputs.model }}'
-          if [ -z "$MODEL" ]; then MODEL='google/gemini-2.5-flash'; fi
+          if [ -z "$MODEL" ]; then MODEL='deepseek/deepseek-v4-flash'; fi
           MODE='${{ inputs.mode }}'
           HN_URL='${{ inputs.hn_url }}'
           FORCE='${{ inputs.force_fetch }}'
