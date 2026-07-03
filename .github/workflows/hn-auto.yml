@@ -13,7 +13,6 @@ on:
         options:
           - "google/gemini-2.5-flash"
           - "google/gemini-2.5-flash-lite"
-          - "google/gemini-3-flash-preview"
           - "google/gemini-3.1-flash-lite"
           - "google/gemini-3.5-flash"
           - "deepseek/deepseek-v4-flash"
@@ -74,8 +73,7 @@ jobs:
           echo "=== Google Gemini ==="
           if [ -n "$GOOGLE_KEY" ]; then
             for model in gemini-2.5-flash gemini-2.5-flash-lite \
-                         gemini-3-flash-preview gemini-3.1-flash-lite \
-                         gemini-3.5-flash; do
+                         gemini-3.1-flash-lite gemini-3.5-flash; do
               CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                 "https://generativelanguage.googleapis.com/v1/models/$model?key=$GOOGLE_KEY")
               printf "  %-30s %s\n" "$model" "$CODE"
