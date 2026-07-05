@@ -1,7 +1,7 @@
 # HN Data Pipeline — 数据源优化设计
 
 > 创作流程大提升计划 第1阶段
-> 状态: 实施中 | 日期: 2026-07-01
+> 状态: 已实施完成 | 日期: 2026-07-01 | 以下为实际实现记录，后续改以此文档为起点
 
 ## 目标
 
@@ -63,7 +63,7 @@ article_fetch_status: "success"    # skipped | success | blocked | not_found | e
 | Poll | HN discussion | **null** | **null** | **skipped** |
 | Jobs | 外部招聘 URL | 外部 URL | 外部 URL | `success` / `blocked` / `error` |
 
-**null 策略：** `url` / `article_url` 为 `null` 时 `extract_article` 直接返回 `fetch_status: "skipped"`，不发起 HTTP 请求。脚本不崩溃。`parse_best_page` 中 `/\Ahttps?:\/\//` 正则匹配区分外部链接与自述帖。
+**null 策略：** `url` / `article_url` 为 `null` 时 `extract_article` / `extract_article_simple` 直接返回 `fetch_status: "skipped"`，不发起 HTTP 请求。脚本不崩溃。`fetch_stories` (Algolia API) 直接返回 `url` 字段，无外链帖为 null。
 
 **post.yaml 实际示例：**
 
@@ -126,23 +126,39 @@ stories:
 
 ## 文章正文提取策略
 
-参考 opencode webfetch 工具设计（HTTP → HTML → Markdown），增加 nokogiri 语义标签过滤：
+双模式设计：
+
+### 模式 A: Simple HTTP（`--fetch-articles-simple`，默认）
+
+纯 Ruby `Net::HTTP`，不需要任何外部服务。适用于 ubuntu-latest CI 和本地开发。
 
 ```
-HTTP GET (浏览器 UA, 5MB limit, 30s timeout)
+HTTP GET (浏览器 UA, 10s open / 20s read timeout)
+  → 质量门禁 6 道 (HTTP 200 / Content-Type / JS阻断 / 软404 / 最小200字 / 可打印字符>=80%)
   → nokogiri 语义标签提取 (<article>/<main>/[role="main"])，去导航/广告
-  → reverse_markdown gem (HTML → Markdown, 类 Turndown)
+  → reverse_markdown gem (HTML → Markdown)
   → YAML content 字段
 ```
 
-**依赖：**
-- `nokogiri`（通过 `github-pages` 内置，无需额外安装）
-- `reverse_markdown` gem (HTML → Markdown)
+**质量门禁失败时**：保留 renderer 缓存的 `article.yaml`（如果有）。
 
-**fallback 链：**
-1. 语义标签（`<article>` / `<main>` / `.post-content` 等）命中 → Markdown 正文
-2. 无命中标签 → 全页 `<body>` → `reverse_markdown` 转 Markdown
-3. HTTP 失败 / 404 — `fetch_status: "error"`，`content: null`
+### 模式 B: Playwright Renderer（`extract_article`，默认旧模式）
+
+需要 `playwright-renderer` Docker 容器 (`localhost:3000`)。仅 self-hosted runner 可能具备。
+
+```
+RENDERER_URL → JS 渲染 → nokogiri 提取 → reverse_markdown
+```
+
+**依赖：**
+- `nokogiri`（内置）
+- `reverse_markdown` gem
+- `playwright-renderer` 容器（仅 renderer 模式需要）
+
+**fallback 链（simple 模式）：**
+1. Simple HTTP 成功 + 6 道门禁通过 → 优质内容 ✅
+2. Simple HTTP 失败 → preserve renderer 缓存（如有）
+3. 无 renderer 缓存 → `fetch_status: "error"` → skill 中 webfetch 兜底
 
 ## Cache 策略
 
@@ -168,7 +184,7 @@ Entry 2: 上周 (只恢复，不保存)
 2. Restore 当前周 cache entry → `_data/hn/<CUR_PATH>/`
 3. Restore 上周 cache entry → `_data/hn/<PREV_PATH>/`
 4. `hn-fetch.rb --best` → 仅写入当前周目录
-5. `hn-auto.rb` → 读缓存生成文章
+5. `opencode /hn --auto` (hn-discussion-summary skill) → 读缓存生成文章
 6. Save 当前周 cache entry → key = `hn-data-<CUR_KEY>-<run_id>`
 
 ### 淘汰模型
@@ -190,8 +206,10 @@ W11 Mon: restore W11 + W10 → save W11 (W09 不再 restore → 7天后淘汰)
 ### CLI
 
 ```
-ruby scripts/hn-fetch.rb --best [--max N] [--force]
-ruby scripts/hn-fetch.rb --url <hn_url> [--force]
+ruby scripts/hn-fetch.rb --best [--max N] [--force] [--jobs N]
+                          [--fetch-articles-simple] [--skip-articles] [--timeout N]
+ruby scripts/hn-fetch.rb --url <hn_url> [--force] [--fetch-articles-simple] [--skip-articles]
+ruby scripts/hn-fetch.rb --fetch-article-url <url> [--timeout N]  # AI 补充用
 ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 ```
 
@@ -200,8 +218,9 @@ ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 1. 计算目标周目录 `_data/hn/<CUR_PATH>/`
 2. `--best`: 抓 HN `/best` → 解析 30 stories → 写 `stories.yaml` → 对 score >= `SCORE_THRESHOLD` 的帖子完整抓取
 3. `--url`: 抓单篇 → 写 `post.yaml` + `comments.yaml` + `article.yaml`
-4. 缓存命中检查：`post.yaml` 存在且 `fetched_at` < 1h → 跳过
+4. 缓存命中检查：`post.yaml` 存在且 `raw_comment_count` 未变 → 跳过
 5. `--force` 忽略缓存，强制重新抓取
+6. 文章提取分两模式：`:simple` (纯HTTP, 含质量门禁) 和 `:renderer` (Playwright, 需renderer服务)
 
 ### stdout 输出
 
@@ -211,145 +230,137 @@ ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 Summary: 2 new posts fetched, 1 article extracted, 95% cache hit
 ```
 
-## hn-auto.rb 改造
+## hn-auto.rb → opencode skill 改造
 
-### 新增标志
+> `hn-auto.rb` 最终未独立实现。替代方案：`hn-discussion-summary` opencode skill（`opencode/skills/hn-discussion-summary/SKILL.md`），通过 `/hn` 命令触发。
 
-```
-ruby scripts/hn-auto.rb --from-cache   # CI 模式：只读缓存，不抓取
-ruby scripts/hn-auto.rb <hn_url>       # 本地模式：优先缓存，回落抓取
-```
+### 缓存读取逻辑（在 skill 中实现）
 
-### 缓存读取逻辑
-
-```ruby
-def load_discussion_from_cache(post_id)
-  # 搜索 _data/hn/*/<post_id>/ 所有周目录
-  # 命中: 读取 YAML → 重建 discuss 字符串格式
-  # 未命中: 返回 nil
-end
-
-def process_story(story, date:)
-  cached = load_discussion_from_cache(story[:id])
-  if cached
-    discussion, title = cached
-  else
-    # 回落实时抓取
-    discussion, title = extract_discussion(story[:hn_url])
-  end
-
-  article_text = load_article_from_cache(story[:id])
-
-  # ... Gemini 调用，传 article_text
-end
-```
+Skill Phase 1 直接从 `_data/hn/` 读取缓存：
+1. `glob _data/hn/*/W*/stories.yaml` → 选取最新周
+2. `glob _data/hn/*/W*/{id}/post.yaml` → 帖子元数据
+3. `glob _data/hn/*/W*/{id}/comments.yaml` → 评论数据
+4. `glob _data/hn/*/W*/{id}/article.yaml` → 文章正文（`fetch_status == 'success'` 时使用）
 
 ### 给 AI 的 article_text
 
-Gemini prompt 新增段：
-```
-## 原文参考
-以下为该 HN 帖子的目标文章内容。撰写"原文概要"时优先参考：
----原文---
-{article_content}
----原文---
+Skill Phase 2 增加文章内容充分性检查（见 SKILL.md）：
+- `< 2000 chars` → MUST 运行 `--fetch-article-url` 补充
+- `2000..4000` → SHOULD
+- `> 4000` → MAY 跳过
+
+## CI YAML（实际实现）
+
+两个独立 workflow：
+
+### `hn-fetch.yml` — 自托管 runner，每日 3 次数据缓存
+
+```yaml
+name: HN Data Fetcher
+on:
+  schedule:
+    - cron: "0 1,9,17 * * *"
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Ruby deps
+        run: gem install nokogiri reverse_markdown 2>&1 | tail -3
+      - uses: ./.github/actions/hn-cache/restore
+      - name: Fetch HN data
+        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+      - uses: ./.github/actions/hn-cache/save
 ```
 
-## CI YAML
+### `hn-auto.yml` — GitHub ubuntu-latest，每日 02:00 UTC 生成
 
 ```yaml
 name: HN Auto-Summarizer
 on:
-  schedule: [{ cron: "0 2 * * *" }]
+  schedule:
+    - cron: "0 2 * * *"
   workflow_dispatch:
-
+    inputs:
+      model:
+        description: "AI 模型"
+        type: choice
+        required: false
+        default: "deepseek/deepseek-v4-flash"
+        options:
+          - "google/gemini-2.5-flash"
+          - "google/gemini-2.5-flash-lite"
+          - "google/gemini-3.1-flash-lite"
+          - "google/gemini-3.5-flash"
+          - "deepseek/deepseek-v4-flash"
+      mode:
+        description: "运行模式 — auto 自动选择 / url 手动指定"
+        type: choice
+        required: false
+        default: "auto"
+        options:
+          - "auto"
+          - "url"
+      hn_url:
+        description: "HN 讨论 URL（mode=url 时必填）"
+        required: false
+        default: ""
+      force_fetch:
+        description: "强制重新抓取，忽略缓存"
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: write
-
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0, persist-credentials: false }
-
       - uses: ruby/setup-ruby@v1
         with: { ruby-version: "3.2", bundler-cache: true }
-
-      - name: Configure Git ...
-
-      - name: Set week keys
+      - name: Configure Git
+        env: { PAT: "\${{ secrets.PAT_FOR_DEPLOY }}" }
         run: |
-          echo "CUR_PATH=$(date -u +%G/W%V)" >> $GITHUB_ENV
-          echo "CUR_KEY=$(date -u +%G-W%V)" >> $GITHUB_ENV
-          echo "PREV_PATH=$(date -u -d '7 days ago' +%G/W%V)" >> $GITHUB_ENV
-          echo "PREV_KEY=$(date -u -d '7 days ago' +%G-W%V)" >> $GITHUB_ENV
-
-      - name: Restore current week cache
-        uses: actions/cache/restore@v4
-        with:
-          path: _data/hn/${{ env.CUR_PATH }}
-          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.CUR_KEY }}-
-
-      - name: Restore previous week cache
-        uses: actions/cache/restore@v4
-        with:
-          path: _data/hn/${{ env.PREV_PATH }}
-          key: hn-data-${{ env.PREV_KEY }}-${{ github.run_id }}
-          restore-keys: hn-data-${{ env.PREV_KEY }}-
-
-      - name: Fetch HN data
-        run: bundle exec ruby scripts/hn-fetch.rb --best
-
-      - name: Generate articles
+          git config user.name "HN Auto-Summarizer"
+          git config user.email "hn-auto@yuedulijie.com"
+          git remote set-url origin "https://github.com/\${{ github.repository }}"
+      - uses: ./.github/actions/setup-opencode
+      - uses: ./.github/actions/hn-cache/restore
+      - name: Fresh fetch discussions + articles (simple HTTP)
+        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
+      - name: Generate articles (opencode auto)
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: bundle exec ruby scripts/hn-auto.rb --from-cache
-
-      - name: Build Jekyll
-        id: jekyll_build
+          GOOGLE_GENERATIVE_AI_API_KEY: "\${{ secrets.GEMINI_API_KEY }}"
+          DEEPSEEK_API_KEY: "\${{ secrets.DEEPSEEK_API_KEY }}"
+        run: opencode run "/hn --auto \$FLAGS" --dir . --dangerously-skip-permissions ...
+      - name: Validate Jekyll build
         run: bundle exec jekyll build
-        continue-on-error: true
-
-      - name: Revert on build failure
-        if: steps.jekyll_build.outcome == 'failure'
-        run: |
-          git checkout -- _articles/
-          exit 1
-
-      - name: Commit and push articles
-        if: steps.jekyll_build.outcome == 'success'
-        run: |
-          git add -A _articles/
-          if [ -n "$(git status --porcelain _articles/)" ]; then
-            git commit -m "feat: HN 自动摘要 $(date -u +%Y-%m-%d)"
-            git push origin HEAD || (git pull --rebase && git push)
-          fi
-
-      - name: Save current week cache
-        uses: actions/cache/save@v4
-        with:
-          path: _data/hn/${{ env.CUR_PATH }}
-          key: hn-data-${{ env.CUR_KEY }}-${{ github.run_id }}
+      - name: Push to master
+        run: git push
 ```
+
+> 注意：`hn-cache/restore` 和 `hn-cache/save` 是 `.github/actions/` 中的 composite action，封装了 `actions/cache@v4` 的周级 key 计算。
 
 ## Makefile
 
 ```makefile
 fetch:
-	docker compose run --rm build ruby scripts/hn-fetch.rb --url "$(url)"
+	docker compose run --rm build ruby scripts/hn-fetch.rb --url "$(url)" --fetch-articles-simple
 
 fetch-best:
-	docker compose run --rm build ruby scripts/hn-fetch.rb --best
+	docker compose run --rm build ruby scripts/hn-fetch.rb --best --fetch-articles-simple --jobs 5
 ```
 
 ## 实施顺序
 
-1. 基础设施 — 目录、gitignore、Gemfile
-2. `hn-fetch.rb` — 核心数据抓取脚本
-3. `hn-auto.rb` — 缓存读取改造
-4. CI YAML — 双 cache entry + 分步
-5. Makefile — fetch/fetch-best 目标
-6. 本地验证 — `make build` + 抓取测试
-7. 对抗式审查
+1. ✅ 基础设施 — 目录、gitignore、Gemfile
+2. ✅ `hn-fetch.rb` — 核心数据抓取脚本（v1: Firebase → Algolia + 线程池 + simple HTTP + 质量门禁）
+3. ✅ `hn-discussion-summary` skill — 替代 `hn-auto.rb`，通过 opencode `/hn` 命令触发
+4. ✅ CI YAML — 双 cache entry + 分步（`hn-cache` action + `hn-fetch.yml` + `hn-auto.yml`）
+5. ✅ Makefile — fetch/fetch-best 目标
+6. ✅ 本地验证 — `make build` + 抓取测试
+7. ✅ 对抗式审查 — 见 AGENTS.md Adversarial Review Gate

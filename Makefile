@@ -32,7 +32,7 @@ build-fast:
 
 fetch:
 	@[ -n "$(url)" ] || (echo "Usage: make fetch url='<hn_url>'" && exit 1)
-	docker compose run --rm build ruby scripts/hn-fetch.rb --url "$(url)"
+	docker compose run --rm build ruby scripts/hn-fetch.rb --url "$(url)" --fetch-articles-simple
 
 fetch-best:
-	docker compose run --rm build ruby scripts/hn-fetch.rb --best
+	docker compose run --rm build ruby scripts/hn-fetch.rb --best --fetch-articles-simple --jobs 5

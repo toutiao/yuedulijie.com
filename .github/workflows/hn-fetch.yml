@@ -16,6 +16,6 @@ jobs:
       - uses: ./.github/actions/hn-cache/restore
 
       - name: Fetch HN data
-        run: ruby scripts/hn-fetch.rb --best --max 15
+        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
 
       - uses: ./.github/actions/hn-cache/save
