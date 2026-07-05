@@ -87,10 +87,12 @@ def fetch_stories_algolia
 end
 
 def fetch_stories_firebase
+  cutoff_48h = Time.now.to_i - 48 * 3600
   ids = firebase_get('beststories.json')
   ids.first(MAX_DEFAULT * 2).map do |id|
     item = firebase_get("item/#{id}.json")
     next unless item && item['type'] == 'story' && item['score'] && item['score'] >= SCORE_THRESHOLD
+    next if item['time'] && item['time'] < cutoff_48h
     {
       'id' => id.to_s,
       'title' => item['title'] || '',
@@ -104,6 +106,67 @@ def fetch_stories_firebase
 end
 
 def fetch_stories
+  fetch_stories_algolia || fetch_stories_firebase
+end
+
+# ── Scrape /best (primary source, no time limit, catches slow-burn) ──
+
+SCRAPE_RETRIES = 3
+SCRAPE_RETRY_DELAY = 3
+
+def scrape_best_page
+  uri = URI('https://news.ycombinator.com/best')
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  http.open_timeout = 10
+  http.read_timeout = 15
+  resp = http.request(Net::HTTP::Get.new(uri))
+  return nil unless resp.code.to_i == 200
+
+  doc = Nokogiri::HTML(resp.body)
+  stories = []
+  dupes = Set.new
+
+  doc.css('tr.athing').each do |row|
+    id = row['id']
+    next unless id
+    next if dupes.include?(id)
+    dupes.add(id)
+
+    title_el = row.at_css('.titleline > a')
+    next unless title_el
+
+    subrow = row.next_element
+    score_el = subrow&.at_css('.score')
+    score = score_el ? score_el.text[/\d+/].to_i : 0
+    next if score < SCORE_THRESHOLD
+
+    a = title_el
+    stories << {
+      'id' => id,
+      'title' => a.text.strip,
+      'url' => a['href'].start_with?('item?') ? nil : a['href'],
+      'hn_url' => "https://news.ycombinator.com/item?id=#{id}",
+      'score' => score,
+      'author' => '',
+      'descendants' => 0,
+    }
+    break if stories.length >= MAX_DEFAULT
+  end
+
+  stories
+end
+
+def fetch_stories_scrape_first
+  SCRAPE_RETRIES.times do |i|
+    begin
+      stories = scrape_best_page
+      return stories if stories && stories.any?
+    rescue => e
+      warn "  Scrape attempt #{i + 1}/#{SCRAPE_RETRIES}: #{e.message}"
+      sleep SCRAPE_RETRY_DELAY * (i + 1)
+    end
+  end
   fetch_stories_algolia || fetch_stories_firebase
 end
 
@@ -914,8 +977,8 @@ def run
   end
 
   # ── --best mode ──
-  puts "\n[1/3] Fetching HN best page (API)..."
-  stories = fetch_stories
+  puts "\n[1/3] Fetching HN best page (scrape /best, fallback API)..."
+  stories = fetch_stories_scrape_first
   puts "  #{stories.length} stories"
   write_stories_index(stories)
 
