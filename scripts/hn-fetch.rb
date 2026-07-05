@@ -696,8 +696,6 @@ end
 
 # ── Fill missing articles (renderer) ──
 
-MIN_FILL_CHARS = 2000
-
 def fill_missing_articles(jobs: 3)
   yr, wk = week_key
   week_dir = File.join(CACHE_DIR, yr, wk)
@@ -719,29 +717,23 @@ def fill_missing_articles(jobs: 3)
 
     article = File.exist?(article_path) ? (YAML.safe_load_file(article_path, permitted_classes: [Time]) rescue nil) : nil
     status = article ? article['fetch_status'] : 'missing'
-    content_len = (article && article['content']) ? article['content'].length : 0
 
     case status
     when 'success'
-      if content_len < MIN_FILL_CHARS
-        puts "  #{post_id}: success but thin (#{content_len} chars), fill"
-        to_fill << { dir: dir, old_chars: content_len }
-      else
-        puts "  #{post_id}: success (#{content_len} chars), skip"
-      end
+      puts "  #{post_id}: success (#{article['content'] ? article['content'].length : 0} chars), skip"
     when 'skipped'
       puts "  #{post_id}: skipped (no URL), skip"
     when 'missing'
-      puts "  #{post_id}: missing article.yaml, fill"
-      to_fill << { dir: dir, old_chars: 0 }
+      puts "  #{post_id}: missing article.yaml, needs fill"
+      to_fill << dir
     else
-      puts "  #{post_id}: #{status}, fill"
-      to_fill << { dir: dir, old_chars: content_len }
+      puts "  #{post_id}: #{status}, needs fill"
+      to_fill << dir
     end
   end
 
   if to_fill.empty?
-    puts "All articles have sufficient content. Nothing to fill."
+    puts "All articles have content. Nothing to fill."
     return
   end
 
@@ -763,22 +755,21 @@ def fill_missing_articles(jobs: 3)
   queue = Queue.new
   to_fill.each { |entry| queue << entry }
   results_mutex = Mutex.new
-  results = { filled: 0, skipped: 0, errors: 0, total_gained: 0 }
+  results = { filled: 0, skipped: 0, errors: 0 }
 
   threads = Array.new([jobs, to_fill.length].min) do
     Thread.new do
       loop do
         entry = queue.pop(true) rescue nil
         break unless entry
-        fill_one_article(entry[:dir], results, results_mutex)
+        fill_one_article(entry, results, results_mutex)
       end
     end
   end
 
   threads.each(&:join)
 
-  gained = results[:total_gained]
-  puts "\nFill summary: #{results[:filled]} filled (+#{gained} chars), #{results[:skipped]} skipped, #{results[:errors]} errors"
+  puts "\nFill summary: #{results[:filled]} filled, #{results[:skipped]} skipped, #{results[:errors]} errors"
 end
 
 def fill_one_article(dir, results, mutex)
@@ -793,7 +784,6 @@ def fill_one_article(dir, results, mutex)
     return
   end
 
-  # Read old content for diff
   article_path = File.join(dir, 'article.yaml')
   old = File.exist?(article_path) ? (YAML.safe_load_file(article_path, permitted_classes: [Time]) rescue nil) : nil
   old_chars = (old && old['content']) ? old['content'].length : 0
@@ -805,9 +795,9 @@ def fill_one_article(dir, results, mutex)
   if article['fetch_status'] == 'success' && article['content'] && !article['content'].strip.empty?
     new_chars = article['content'].length
 
-    # Only overwrite if new content >= old content (renderer should be >= simple)
-    if new_chars < old_chars && old_chars >= MIN_FILL_CHARS
-      puts "  #{post_id}: renderer got LESS content (#{new_chars} < #{old_chars}), keep existing"
+    # Renderer should produce >= existing content. If not, keep old.
+    if new_chars < old_chars && old_chars > 0
+      puts "  #{post_id}: renderer got LESS (#{new_chars} < #{old_chars}), keep existing"
       mutex.synchronize { results[:skipped] += 1 }
       return
     end
@@ -821,11 +811,9 @@ def fill_one_article(dir, results, mutex)
     File.write(post_path, YAML.dump(post))
 
     gained = new_chars - old_chars
-    puts "  #{post_id}: filled (#{new_chars} chars, +#{gained})"
-    mutex.synchronize do
-      results[:filled] += 1
-      results[:total_gained] += gained
-    end
+    suffix = gained > 0 ? " (+#{gained})" : ""
+    puts "  #{post_id}: filled (#{new_chars} chars#{suffix})"
+    mutex.synchronize { results[:filled] += 1 }
   else
     reason = article['fetch_status'] || 'unknown'
     reason = 'empty content' if article['fetch_status'] == 'success' && (!article['content'] || article['content'].strip.empty?)
