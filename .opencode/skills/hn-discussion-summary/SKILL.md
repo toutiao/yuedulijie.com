@@ -95,7 +95,7 @@ Find week: `glob _data/hn/*/W*/`.
 
 ### Step 1 — Article sufficiency
 Read `article.yaml`. Check `content` length:
-- `< 2000` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<url>" --timeout 30`
+- `< 2000` → **MUST** run `bundle exec ruby scripts/hn-fetch.rb --fetch-article-url "<url>" --timeout 30`
 - `2000..4000` → **SHOULD** run
 - `> 4000` → **MAY** proceed
 
