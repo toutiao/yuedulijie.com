@@ -47,6 +47,7 @@ jobs:
           persist-credentials: false
 
       - uses: ruby/setup-ruby@v1
+        if: ${{ inputs.force_fetch == 'true' }}
         with:
           ruby-version: "3.2"
           bundler-cache: true
@@ -134,6 +135,7 @@ jobs:
           git status --short -- _articles/ 2>/dev/null || true
 
       - name: Validate Jekyll build
+        if: ${{ inputs.force_fetch == 'true' }}
         run: bundle exec jekyll build
 
       - name: Push to master
