@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - uses: ruby/setup-ruby@v1
@@ -65,10 +65,11 @@ jobs:
 
       - uses: ./.github/actions/hn-cache/restore
 
-      - name: Fresh fetch discussions + articles (simple HTTP)
+      - name: Fresh fetch (force only)
+        if: ${{ inputs.force_fetch == 'true' }}
         run: |
-          echo "Fetching fresh data before generation..."
-          bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
+          echo "Force fetch: refreshing HN data..."
+          bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20 --force
 
       - name: Check API keys
         env:
