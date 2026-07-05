@@ -123,7 +123,7 @@ jobs:
           fi
           opencode run "$HN_CMD" --dir . \
             --dangerously-skip-permissions \
-            --model "$MODEL" --print-logs 2>&1
+            --model "$MODEL" 2>&1
 
       - name: Show changes
         run: |
