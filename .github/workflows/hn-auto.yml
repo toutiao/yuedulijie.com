@@ -66,6 +66,9 @@ jobs:
 
       - uses: ./.github/actions/hn-cache/restore
 
+      - name: Install article fetch deps
+        run: gem install nokogiri reverse_markdown 2>&1 | tail -3
+
       - name: Fresh fetch (force only)
         if: ${{ inputs.force_fetch == 'true' }}
         run: |
