@@ -23,6 +23,8 @@ Stories must pass all:
 - item id not in `_articles/*.md` (dedup)
 - same topic not covered today (grep today's date + keyword in existing articles)
 
+> `stories.yaml` 已由 `hn-fetch.rb` 在写入时做过一次 dedup（过滤已出现在 `_articles/` 中的 HN ID）。此处为第二层检查，防止脚本层漏网。
+
 ### Auto mode
 1. Source: Read cached stories from `_data/hn/`
    - `glob _data/hn/*/W*/stories.yaml` → pick newest week

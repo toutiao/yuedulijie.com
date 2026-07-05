@@ -608,6 +608,17 @@ end
 # ── stories index writer ──
 
 def write_stories_index(stories)
+  existing_ids = Dir.glob('_articles/**/*.md').flat_map { |f|
+    File.read(f).scan(/item\?id=(\d+)/).flatten
+  }.uniq
+
+  if existing_ids.any?
+    before = stories.length
+    stories = stories.reject { |s| existing_ids.include?(s['id']) }
+    after = stories.length
+    puts "  Dedup: #{before - after} stories already in _articles/, #{after} remaining"
+  end
+
   path = stories_index_path
   FileUtils.mkdir_p(File.dirname(path))
   File.write(path, YAML.dump({
