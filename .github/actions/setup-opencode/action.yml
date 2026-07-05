@@ -1,5 +1,5 @@
 name: 'Setup OpenCode'
-description: 'Install opencode CLI'
+description: 'Install opencode CLI (with binary caching)'
 inputs:
   version:
     description: 'Version to install (e.g. 1.17.12)'
@@ -8,10 +8,25 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.opencode/bin/opencode
+        key: opencode-bin-${{ inputs.version || 'latest' }}
     - shell: bash
       run: |
-        if [ -n "${{ inputs.version }}" ]; then
-          curl -fsSL https://opencode.ai/install | bash -s -- --version "${{ inputs.version }}"
+        if [ -x "$HOME/.opencode/bin/opencode" ]; then
+          echo "opencode restored from cache"
         else
-          curl -fsSL https://opencode.ai/install | bash
+          if [ -n "${{ inputs.version }}" ]; then
+            curl -fsSL https://opencode.ai/install | bash -s -- --version "${{ inputs.version }}"
+          else
+            curl -fsSL https://opencode.ai/install | bash
+          fi
         fi
+        echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+    - uses: actions/cache/save@v4
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        path: ~/.opencode/bin/opencode
+        key: opencode-bin-${{ inputs.version || 'latest' }}
