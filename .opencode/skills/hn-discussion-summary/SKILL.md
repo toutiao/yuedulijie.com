@@ -80,7 +80,7 @@ Drop leading common words (Claude, new, update, Introducing) → first meaningfu
 
 ---
 
-## Phase 1 — Research (raw data → RD)
+## Phase 1 — Fetch + Analyze
 
 ### Cache
 Prefer `_data/hn/`. Fallback `webfetch` only.
@@ -93,79 +93,24 @@ Prefer `_data/hn/`. Fallback `webfetch` only.
 
 Find week: `glob _data/hn/*/W*/`.
 
-### Step 1 — Article sufficiency
+### Sufficiency check
 Read `article.yaml`. Check `content` length:
 - `< 2000` → **MUST** run `bundle exec ruby scripts/hn-fetch.rb --fetch-article-url "<url>" --timeout 30`
 - `2000..4000` → **SHOULD** run
 - `> 4000` → **MAY** proceed
 
-exit 0 → use stdout content. exit 1 → use cached.
+exit 0 → use stdout. exit 1 → use cached.
 
-### Step 2 — Extract concrete details
-Read article. Extract specifics for 原文概要:
-
-| Type | Extract | Why |
-|------|---------|-----|
-| 角色 | person name / role | story feel |
-| 数字 | %, $, time, count | precise > vague |
-| 产品功能 | feature name | "蜡烛按钮" >> "各种功能" |
-| 荒诞点 | absurd / irony / paradox | most memorable |
-| 情节 | cause → twist → outcome | narrative line |
-
-> Output: **Details block** (~5-8 items, EN/CN mix ok)
-
-### Step 3 — Theme + quote pool
-Read `comments.yaml` (top 100 by score). Group 4-8 themes:
-
-```
-Theme: [name] (热度: 🔥/💬/📎)
-  立场: for / against / neutral / split
-  candidates:
-  - [comment:id] "quote" — user
-  观察: what's unique about this theme?
-```
-
-Record comment ID for each quote (Phase 2.5 verify).
-
-### Step 4 — Discussion structure
-Identify:
-- Clear opposition (two camps)?
-- Personal experience (共鸣)?
-- Humor / parody side-thread?
-- Consensus or split?
-
-### Phase 1 output
-
-Merge Step 2-4 into **Research Document** (context only, no disk):
-
-```
-—— Research Document ——
-【原文具体细节】
-- 角色: ...
-- 数字: ...
-- 荒诞点: ...
-- 情节: ...
-
-【主题分布】
-- Theme 1: ... (引文: comment:id)
-- Theme 2: ...
-
-【讨论结构】
-- 争议: ...
-- 情绪: ...
-—— RD END ——
-```
-
-Verify RD complete before Phase 2. No missing key themes.
-
-### Single mode
-Same Step 2-4.
+### Single post mode
+1. Read article → note concrete details for 原文概要 (names, numbers, features, absurdities)
+2. Read `comments.yaml` (top 100 by score) → extract 4-8 themes with quotes
+3. Record `comment:id` for each quote (Phase 2.5 verify)
+4. Identify: key opposition, personal-experience threads, overall sentiment
 
 ### Cluster mode
 1. Main: top 20 comments by score
 2. Related: top 8 each
 3. Track `thread_id` per quote (e.g. `[thread 2]`)
-4. RD label each quote with thread
 
 ---
 
@@ -175,8 +120,6 @@ Load `chinese-writing-style` first.
 (引文原文不受 style 约束. 翻译和讨论段受约束.)
 
 > caveman mode applies to AI communication only. Article body stays normal expressive CN.
-
-**Re-read full RD** before writing. Ensure all details + quotes in working memory.
 
 ### Front matter
 
@@ -220,12 +163,12 @@ Must anchor to facts. Never fabricate. Not displayed — indexed via `<a title="
 
 ### Quality rules
 
-1. **Concrete > abstract** — "面包 33% 烤焦率" not "产品有问题". Use RD Details block.
+1. **Concrete > abstract** — "面包 33% 烤焦率" not "产品有问题". Names, numbers, specific features.
 2. **Quote-driven** — each theme section >= 1 quote (EN + CN). No "很多读者认为".
 3. **Narrative arc** — 原文概要: cause → twist → outcome. 总体情绪: divergence → strong closing line.
 
 ### Article structure (fixed order)
-1. **原文概要** — 2-5 paragraphs. Source: "HN 首页 (/news)" or "HN 热门榜 (/best)". Use RD specifics (names, numbers, features).
+1. **原文概要** — 2-5 paragraphs. Source: "HN 首页 (/news)" or "HN 热门榜 (/best)". Use concrete details (names, numbers, features).
 2. **讨论焦点** — `###` sections. Each:
    ```
    > "text" — user
@@ -280,7 +223,7 @@ Read full draft. Checklist:
 
 | # | Check | Pass |
 |---|-------|------|
-| 1 | 原文概要 specific? | >= 3 RD items (names/numbers/features) |
+| 1 | 原文概要 specific? | >= 3 concrete items (names/numbers/features) |
 | 2 | 讨论焦点 quotes? | Each theme section >= 1 quote |
 | 3 | Concrete not vague? | No "很多人表示". Each sentence anchored. |
 | 4 | 观点表 covers split? | >= 4 rows, includes opposing views |
