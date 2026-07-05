@@ -86,7 +86,7 @@ From selected post title: drop leading common words (Claude, new, update, Introd
 
 ---
 
-## Phase 1 — Fetch + Analyze
+## Phase 1 — Research (输入 → Research Document)
 
 ### Cache strategy
 
@@ -101,18 +101,85 @@ Cache file locations (replace `YYYY`/`WNN`/`{id}` as needed):
 
 Use `glob _data/hn/*/W*/` to find the week dir, then read files for the selected story id.
 
+### Step 1 — 确保原文内容充足
+
+Read `article.yaml`. Check `content` field length:
+- `< 2000 chars` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<article_url>" --timeout 30` to attempt fuller fetch
+- `2000..4000 chars` → **SHOULD** run the same command
+- `> 4000 chars` → **MAY** proceed directly
+
+If the fetch succeeds (exit 0), use the stdout content as supplementary context.
+If it fails (exit 1), proceed with existing cached content.
+
+### Step 2 — 精读原文，提取具体细节
+
+Read the article content. Extract concrete details worth referencing in 原文概要:
+
+| 类别 | 提取什么 | 原因 |
+|------|---------|------|
+| 角色 | 人名 / 角色名 / 真实人物 | 让概要有故事感 |
+| 数字 | 百分比 / 金额 / 时间 / 数量 | 具体数字比"很多"有力 |
+| 产品功能 | 具体功能名称 / 特性 | 相比"各种功能","蜡烛按钮"更生动 |
+| 荒诞点 | 反常识 / 讽刺 / 矛盾 | 读完后最容易被记住的点 |
+| 关键情节 | 起因 → 转折 → 结局链条 | 概要需要一条叙事线 |
+
+> 这一步产出一个 **Details 块**（~5-8 条，中英夹杂没关系，供自己参考）
+
+### Step 3 — 分类评论，建立主题 + 引文池
+
+Read `comments.yaml` (top 100 by score). Group into 4-8 themes:
+
+```
+Theme: [主题名称] （热度: 🔥高/💬中/📎低）
+  立场: 支持 / 反对 / 中立 / 争议
+  引文候选:
+  - [comment:id] "quote" — username（赞成 or 反对）
+  - [comment:id] "quote" — username
+  关键观察: 这个主题的讨论有何独特性？
+```
+
+每条引文的 comment ID 必须记录（Phase 2.5 验证需要）。
+
+### Step 4 — 判断讨论结构
+
+识别讨论的整体格局：
+- 是否存在明显争议（两派对立）？
+- 是否大量读者有亲身经历（共鸣帖）？
+- 是否存在幽默/讽刺/戏仿的副线？
+- 讨论是共识居多还是分裂居多？
+
+### Phase 1 产出
+
+将 Step 2-4 汇总为一个 **Research Document**（保留在上下文，不落盘）。结构：
+
+```
+—— Research Document ——
+【原文具体细节】  ← 来自 Step 2
+- 角色: ...
+- 数字: ...
+- 荒诞点: ...
+- 关键情节: ...
+
+【主题分布】  ← 来自 Step 3
+- Theme 1: ...（引文: comment:id, comment:id）
+- Theme 2: ...
+
+【讨论结构】  ← 来自 Step 4
+- 争议焦点: ...
+- 情绪基调: ...
+—— RD END ——
+```
+
+进入 Phase 2 前确认 Research Document 完整，不缺失关键主题。
+
 ### Single post mode
-1. Read `_data/hn/*/W*/{id}/comments.yaml` → extract quotes + usernames
-2. If `article.fetch_status == 'success'`, read `article.yaml` → use `content` field
-   - Fallback: `webfetch` linked article URL
-3. Extract: topic clusters / quotes+usernames / unique opinions
-4. Record HN comment item id for each quote used
+同上 Step 2-4。
 
 ### Cluster mode
-1. Main post: read cached comments, top 20 by score
-2. Each related post: read cached comments, top 8 by score
+1. Main post: top 20 comments by score
+2. Each related post: top 8 by score
 3. Track `thread_id` per quote (e.g. "[thread 2]")
-4. Merge all comments, group by theme (not by thread)
+4. Research Document 标注每条引文的 thread 归属
 
 ---
 
@@ -121,7 +188,10 @@ Use `glob _data/hn/*/W*/` to find the week dir, then read files for the selected
 Load `chinese-writing-style` skill before writing.
 (引文原文不受 style 约束, 保持原样. 翻译和讨论段受约束.)
 
+写作前**重新完整通读一遍 Research Document**，确保所有关键细节和引文都在工作记忆中。
+
 ### Front matter
+
 ```
 ---
 layout: post
@@ -161,18 +231,18 @@ No hacky/clickbait: 震惊, 惊人, 万万没想到. Movies/books: spoiler-free,
 
 Must anchor to actual article facts (event/viewpoint). Never fabricate. Not displayed externally — lives in front matter, indexed via `<a title="...">`.
 
-### Article content sufficiency check (before writing)
+### 写作质量要求
 
-After reading `article.yaml`, check `content` field length:
-- `< 2000 chars` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<article_url>" --timeout 30` to attempt fuller fetch
-- `2000..4000 chars` → **SHOULD** run the same command
-- `> 4000 chars` → **MAY** proceed directly
+写作时始终遵循以下三条：
 
-If the fetch succeeds (exit 0), use the stdout content as supplementary context.
-If it fails (exit 1), proceed with existing cached content.
+1. **具体优先于抽象** — 用"面包 33% 烤焦率"代替"产品存在问题"；用"蜡烛按钮、壁炉模式、斋月模式"代替"各种新功能"。Research Document 的 Details 块就是干这个的。
+
+2. **引文驱动讨论** — 每个讨论主题 section 至少展示一条引文（原文 + 翻译），引文是讨论焦点的核心载体。不要空泛归纳"很多读者认为"。
+
+3. **有叙事弧线** — 原文概要从起因到结局有一条完整线。总体情绪从分歧走向一个有力的退场句，避免平淡收尾。
 
 ### Article structure (fixed order)
-1. **原文概要** — context intro, 2-5 paragraphs. Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)"
+1. **原文概要** — context intro, 2-5 paragraphs. Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)". 必须使用 Research Document 中的具体细节（人名、数字、产品功能），避免抽象概括。
 2. **讨论焦点** — key themes in `###` sections. Each blockquote followed by CN translation:
    ```
    > "English text" — username
@@ -182,7 +252,7 @@ If it fails (exit 1), proceed with existing cached content.
    - No blank line between quote and translation
    - Cluster mode: attribution → `[thread #N]`
 3. **典型观点一览** — table: 立场 / 用户 / 一句话
-4. **总体情绪** — 1-2 paragraphs
+4. **总体情绪** — 1-2 paragraphs, end with a strong closing line
 5. **引用帖子** — markdown table: # / 标题 / URL (auto-generated)
 6. **免责声明** — `<div class="disclaimer">` at bottom
 
@@ -210,9 +280,10 @@ Never fabricate model name. If unsure, write literal `{provider}/{model}`.
 
 ---
 
-## Phase 2.5 — Fact Check (REQUIRED, no skip)
+## Phase 2.5 — Fact Check + Revision (REQUIRED, no skip)
 
-### Quote verification per comment
+### Step 1 — 引文验证
+
 1. `webfetch` HN comment page (html) — `https://news.ycombinator.com/item?id={comment_id}`
 2. Locate comment: `<span class="commtext c00">`
 3. Compare rendered text vs article quote:
@@ -223,8 +294,23 @@ Never fabricate model name. If unsure, write literal `{provider}/{model}`.
 4. Fix any flagged discrepancy
 5. Report: ✓ verified / ⚠ fixed / ✗ flagged
 
+### Step 2 — 质量自审
+
+通读全文，Checklist:
+
+| # | 检查项 | 通过条件 |
+|---|--------|---------|
+| 1 | 原文概要是否有具体细节？ | 包含至少 3 个 Research Document 中的具体项（人名/数字/功能名） |
+| 2 | 讨论焦点是否引文充分？ | 每个主题 section 至少 1 条引文 |
+| 3 | 整体语言是否具体而非空泛？ | 无"很多人表示"类批发表述，每句都锚定具体信息 |
+| 4 | 观点表是否覆盖主要争议？ | 至少 4 行，包含正反立场 |
+| 5 | 总体情绪是否有有力的退场句？ | 最后一句不只重复前文，而是收束或点睛 |
+
+有未通过的项 → 修改对应段落 → 重新检查。
+
 ### Sensitivity scan
-After quote verification, scan article body (including blockquotes, excluding disclaimer) for sensitive terms:
+
+After revision, scan article body (including blockquotes, excluding disclaimer) for sensitive terms:
 `[china/ccp/tiananmen/taiwan/tibet/xinjiang/hong kong]` + `[censorship/surveillance/human rights/propaganda]`
 
 | Hit found? | Action |
