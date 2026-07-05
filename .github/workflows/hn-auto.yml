@@ -136,4 +136,11 @@ jobs:
         run: bundle exec jekyll build
 
       - name: Push to master
-        run: git push
+        run: |
+          git add -A _articles/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "feat: HN 自动摘要 $(date -u +%Y-%m-%d)"
+          fi
+          git push
