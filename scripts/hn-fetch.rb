@@ -8,6 +8,7 @@
 #                            [--fetch-articles-simple] [--skip-articles] [--timeout N]
 #   ruby scripts/hn-fetch.rb --url <hn_url> [--force]
 #   ruby scripts/hn-fetch.rb --fetch-article-url <url> [--timeout N]
+#   ruby scripts/hn-fetch.rb --fill-missing [--jobs N]
 #   ruby scripts/hn-fetch.rb --output <dir>
 
 require 'net/http'

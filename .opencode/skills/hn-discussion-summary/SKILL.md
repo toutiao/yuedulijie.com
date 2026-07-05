@@ -280,7 +280,7 @@ Read full draft. Checklist:
 
 | # | Check | Pass |
 |---|-------|------|
-| 1 | 原文概要 specifc? | >= 3 RD items (names/numbers/features) |
+| 1 | 原文概要 specific? | >= 3 RD items (names/numbers/features) |
 | 2 | 讨论焦点 quotes? | Each theme section >= 1 quote |
 | 3 | Concrete not vague? | No "很多人表示". Each sentence anchored. |
 | 4 | 观点表 covers split? | >= 4 rows, includes opposing views |
