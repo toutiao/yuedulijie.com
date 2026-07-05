@@ -65,6 +65,11 @@ jobs:
 
       - uses: ./.github/actions/hn-cache/restore
 
+      - name: Fresh fetch discussions + articles (simple HTTP)
+        run: |
+          echo "Fetching fresh data before generation..."
+          ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
+
       - name: Check API keys
         env:
           GOOGLE_KEY: ${{ secrets.GEMINI_API_KEY }}

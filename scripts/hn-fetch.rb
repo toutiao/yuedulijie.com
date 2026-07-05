@@ -4,9 +4,11 @@
 # HN Data Fetcher — cache HN discussions + target articles for AI consumption
 #
 # Usage:
-#   ruby scripts/hn-fetch.rb --best [--max N] [--force]
+#   ruby scripts/hn-fetch.rb --best [--max N] [--force] [--jobs N]
+#                            [--fetch-articles-simple] [--skip-articles] [--timeout N]
 #   ruby scripts/hn-fetch.rb --url <hn_url> [--force]
-#   ruby scripts/hn-fetch.rb --output <dir>  # override cache root
+#   ruby scripts/hn-fetch.rb --fetch-article-url <url> [--timeout N]
+#   ruby scripts/hn-fetch.rb --output <dir>
 
 require 'net/http'
 require 'uri'
@@ -18,10 +20,12 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
+require 'thwait'
 
 RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 
 $stdout.sync = true
+$print_mutex = Mutex.new
 
 CACHE_DIR = '_data/hn'
 SCORE_THRESHOLD = 80
@@ -31,36 +35,39 @@ COMMENT_CAP = 100
 ARTICLE_TRUNCATE = 8000
 HN_API_BASE = 'https://hacker-news.firebaseio.com/v0'
 ALGOLIA_API = 'https://hn.algolia.com/api/v1'
-$hn_http = nil
 
-def hn_http
-  $hn_http ||= begin
-    uri = URI(HN_API_BASE)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    http.open_timeout = 10
-    http.read_timeout = 15
-    http.start
-    http
-  end
+# Per-domain concurrency limit for simple article fetch
+MAX_PER_DOMAIN = 2
+$domain_mutex = Mutex.new
+$domain_conns = {}
+$domain_cv = ConditionVariable.new
+
+# ── API (thread-safe, per-request HTTP) ──
+
+def api_get_json(url, open_timeout: 10, read_timeout: 15)
+  uri = URI(url)
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = uri.scheme == 'https'
+  http.open_timeout = open_timeout
+  http.read_timeout = read_timeout
+  resp = http.request(Net::HTTP::Get.new(uri.request_uri))
+  JSON.parse(resp.body)
+rescue => e
+  raise "API fetch failed #{url}: #{e.message}"
 end
 
-def fetch_via_api(endpoint)
-  resp = hn_http.get("/v0/#{endpoint}")
-  body = JSON.parse(resp.body)
-  [resp.code.to_i, body]
-rescue => e
-  raise "API fetch failed #{endpoint}: #{e.message}"
+def firebase_get(endpoint)
+  api_get_json("#{HN_API_BASE}/v0/#{endpoint}")
 end
 
 def algolia_get(endpoint)
-  uri = URI("#{ALGOLIA_API}/#{endpoint}")
-  resp = Net::HTTP.get_response(uri)
-  JSON.parse(resp.body)
+  api_get_json("#{ALGOLIA_API}/#{endpoint}")
 rescue => e
   warn "Algolia API error #{endpoint}: #{e.message}" if $stderr.tty?
   nil
 end
+
+# ── Stories ──
 
 def fetch_stories_algolia
   cutoff = (Time.now.to_i - 48 * 3600).to_s
@@ -80,9 +87,9 @@ def fetch_stories_algolia
 end
 
 def fetch_stories_firebase
-  _, ids = fetch_via_api('beststories.json')
+  ids = firebase_get('beststories.json')
   ids.first(MAX_DEFAULT * 2).map do |id|
-    _, item = fetch_via_api("item/#{id}.json")
+    item = firebase_get("item/#{id}.json")
     next unless item && item['type'] == 'story' && item['score'] && item['score'] >= SCORE_THRESHOLD
     {
       'id' => id.to_s,
@@ -99,6 +106,8 @@ end
 def fetch_stories
   fetch_stories_algolia || fetch_stories_firebase
 end
+
+# ── Comments ──
 
 def flatten_comments(children)
   (children || []).select { |c| c['type'] == 'comment' }.flat_map { |c|
@@ -135,7 +144,7 @@ end
 def parse_comments_firebase(ids)
   comments = []
   ids.each do |cid|
-    _, c = fetch_via_api("item/#{cid}.json")
+    c = firebase_get("item/#{cid}.json")
     next unless c && c['type'] == 'comment' && c['text'] && !c['text'].empty?
     text = Nokogiri::HTML(c['text']).text.strip
     next if text.empty?
@@ -152,7 +161,7 @@ def parse_comments_firebase(ids)
 end
 
 def fetch_discussion_firebase(post_id)
-  _, item = fetch_via_api("item/#{post_id}.json")
+  item = firebase_get("item/#{post_id}.json")
   return nil unless item
 
   comments = item['kids'] ? parse_comments_firebase(item['kids']) : []
@@ -178,7 +187,7 @@ end
 
 DiscussionResult = Struct.new(:post_title, :post_url, :score, :author, :posted_at, :comments, :raw_comment_count)
 
-# ── Browser fetch (for article JS rendering) ──
+# ── Browser fetch (for article JS rendering, requires renderer service) ──
 
 def fetch_with_browser(url, js_render: false)
   uri = URI("#{RENDERER_URL}/render")
@@ -191,7 +200,7 @@ rescue => e
   raise "Browser fetch failed for #{url}: #{e.message}"
 end
 
-# ── Article extraction (nokogiri + reverse_markdown) ──
+# ── Article extraction (renderer-based, requires browser service) ──
 
 def extract_article(url)
   result = {
@@ -245,6 +254,166 @@ def extract_article(url)
   result
 end
 
+# ── Simple article extraction (pure HTTP, no renderer) ──
+
+JS_BLOCKER_PATTERNS = [
+  /enable.{0,30}javascript/i,
+  /checking your browser/i,
+  /verifying your browser/i,
+  /\bcloudflare\b.{0,50}(challenge|security|ray\s*id)/i,
+  /attention required/i,
+  /captcha/i,
+  /document\.(write|cookie|location)/,
+  /<meta\s[^>]*http-equiv=["']refresh["']/i,
+].freeze
+
+SOFT_404_PATTERNS = [
+  /page\s+not\s+found/i,
+  /this\s+page\s+could\s+not\s+be\s+found/i,
+  /404\s*(not\s*)?found/i,
+].freeze
+
+MIN_ARTICLE_CHARS = 200
+MIN_PRINTABLE_RATIO = 0.80
+
+def printable_ratio(text)
+  printable = text.count(" -~\n\r\t")
+  total = text.length
+  total > 0 ? printable.to_f / total : 0.0
+end
+
+def content_passes_gates(body, url)
+  return :empty if body.nil? || body.empty?
+
+  # JS blocker / challenge detection (structural)
+  return :js_blocker if JS_BLOCKER_PATTERNS.any? { |p| body.match?(p) }
+
+  # Soft 404 via title + h1
+  doc = Nokogiri::HTML(body)
+  title = doc.at_css('title')&.text || ''
+  h1 = doc.at_css('h1')&.text || ''
+  combined = title + ' ' + h1
+  return :soft_404 if SOFT_404_PATTERNS.any? { |p| combined.match?(p) }
+
+  # Strip HTML, check plain text length
+  text = doc.text.strip
+  return :too_short if text.length < MIN_ARTICLE_CHARS
+
+  # Check printable character ratio
+  return :binary if printable_ratio(text) < MIN_PRINTABLE_RATIO
+
+  :pass
+end
+
+def extract_article_simple(url, open_timeout: 10, read_timeout: 20)
+  result = {
+    'url' => url,
+    'title' => nil,
+    'fetch_status' => nil,
+    'content' => nil,
+    'error' => nil,
+    'fetched_at' => Time.now.utc.iso8601
+  }
+
+  return result.merge('fetch_status' => 'skipped') if url.nil? || url.empty?
+
+  begin
+    uri = URI(url)
+    unless uri.is_a?(URI::HTTP)
+      return result.merge('fetch_status' => 'skipped', 'error' => "non-http scheme: #{uri.scheme}")
+    end
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme == 'https'
+    http.open_timeout = open_timeout
+    http.read_timeout = read_timeout
+    http.max_retries = 0
+
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request['User-Agent'] = 'Mozilla/5.0 (compatible; yuedulijie.com/1.0; HN article fetcher)'
+    request['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    request['Accept-Language'] = 'en-US,en;q=0.5'
+
+    resp = http.request(request)
+
+    # Gate 1: HTTP status
+    code = resp.code.to_i
+    unless code == 200
+      status = case code
+               when 403 then 'blocked'
+               when 404 then 'not_found'
+               else 'error'
+               end
+      return result.merge('fetch_status' => status, 'error' => "HTTP #{code}")
+    end
+
+    # Gate 2: Content-Type must be HTML
+    content_type = (resp['Content-Type'] || '').downcase
+    unless content_type.start_with?('text/html', 'application/xhtml+xml')
+      return result.merge('fetch_status' => 'skipped', 'error' => "non-html content-type: #{content_type}")
+    end
+
+    body = resp.body
+    body.force_encoding('UTF-8')
+    unless body.valid_encoding?
+      body = body.encode('UTF-8', invalid: :replace, undef: :replace)
+    end
+
+    # Gates 3-6: content quality
+    gate = content_passes_gates(body, url)
+    unless gate == :pass
+      return result.merge('fetch_status' => 'error', 'error' => "gate: #{gate}")
+    end
+
+    # Parse article
+    doc = Nokogiri::HTML(body)
+    result['title'] = doc.at_css('title')&.text&.strip
+
+    doc.css(
+      'script, style, nav, footer, header, aside, noscript, iframe, ' \
+      '.sidebar, .nav, .menu, .comments, .comment-list, .related-posts'
+    ).each(&:remove)
+
+    article_el = doc.at_css(
+      'article, main, [role="main"], .article, .post-content, ' \
+      '.entry-content, .content, .post, .blog-post, #content'
+    )
+    content_source = article_el || doc.at_css('body') || doc
+
+    markdown = ReverseMarkdown.convert(content_source.inner_html, unknown_tags: :drop)
+    markdown = markdown.gsub(/\n{3,}/, "\n\n").strip
+
+    result['content'] = markdown[0, ARTICLE_TRUNCATE]
+    result['fetch_status'] = 'success'
+  rescue Net::OpenTimeout, Net::ReadTimeout => e
+    result.merge('fetch_status' => 'error', 'error' => "timeout: #{e.message[0, 100]}")
+  rescue => e
+    result.merge('fetch_status' => 'error', 'error' => e.message[0, 500])
+  end
+
+  result
+end
+
+# ── Per-domain concurrency limiter ──
+
+def with_domain(domain)
+  $domain_mutex.synchronize do
+    $domain_conns[domain] ||= 0
+    while $domain_conns[domain] >= MAX_PER_DOMAIN
+      $domain_cv.wait($domain_mutex)
+    end
+    $domain_conns[domain] += 1
+  end
+
+  yield
+ensure
+  $domain_mutex.synchronize do
+    current = $domain_conns[domain]
+    $domain_conns[domain] = current && current > 0 ? current - 1 : 0
+    $domain_cv.broadcast
+  end
+end
+
 # ── Cache path helpers ──
 
 def week_key(date = Date.today)
@@ -257,6 +426,11 @@ def post_cache_dir(post_id, date: nil)
   date ||= Date.today
   yr, wk = week_key(date)
   File.join(CACHE_DIR, yr, wk, post_id)
+end
+
+def stories_index_path
+  yr, wk = week_key
+  File.join(CACHE_DIR, yr, wk, 'stories.yaml')
 end
 
 def find_post_dir(post_id)
@@ -315,7 +489,8 @@ end
 
 # ── Core fetch + cache ──
 
-def fetch_and_cache(hn_url, known_meta: nil, force: false)
+def fetch_and_cache(hn_url, known_meta: nil, force: false, article_mode: :renderer,
+                    simple_timeout: 20)
   post_id = known_meta ? known_meta['id'] : hn_url[/\d+/]
   return [:error, nil, "no post_id extracted from #{hn_url}"] unless post_id
 
@@ -323,11 +498,9 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     cached_post = load_cached_post(post_id)
     comments = load_cached_comments(post_id)
     article = load_cached_article(post_id)
-    # descendants 未变 → 无新评论，跳过
     if cached_post && known_meta && known_meta['descendants'] == cached_post['raw_comment_count']
       return [:cached, { 'post' => cached_post, 'comments' => comments, 'article' => article }, nil]
     end
-    # descendants 变化 → 落盘重抓
   end
 
   disc = fetch_discussion(post_id)
@@ -339,30 +512,56 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false)
     return [:error, nil, "failed to fetch discussion for #{post_id}"]
   end
 
+  article_url = disc.post_url || known_meta&.dig('url')
+
   post_data = {
     'id' => post_id,
     'title' => disc.post_title,
-    'url' => known_meta ? known_meta['url'] : disc.post_url,
+    'url' => article_url,
     'hn_url' => hn_url,
     'score' => known_meta ? known_meta['score'] : disc.score,
     'author' => known_meta ? known_meta['author'] : disc.author,
     'posted_at' => disc.posted_at,
     'fetched_at' => Time.now.utc.iso8601,
-    'article_url' => disc.post_url,
+    'article_url' => article_url,
     'article_fetch_status' => nil,
+    'article_fetched_at' => nil,
     'raw_comment_count' => disc.raw_comment_count,
   }
 
-  article_url = disc.post_url
-  article_url = known_meta['url'] if article_url.nil? && known_meta
-
   cached_article = load_cached_article(post_id)
-  if cached_article && cached_article['fetch_status'] == 'success' && cached_article['url'] == article_url
-    article_data = cached_article
-  else
-    article_data = extract_article(article_url)
-  end
+
+  article_data = case article_mode
+                 when :skip
+                   cached_article || { 'fetch_status' => 'skipped' }
+
+                 when :simple
+                   domain = URI.parse(article_url.to_s).host rescue nil
+                   if domain
+                     with_domain(domain) do
+                       attempt = extract_article_simple(article_url, read_timeout: simple_timeout)
+                       if attempt['fetch_status'] == 'success'
+                         attempt
+                       elsif cached_article && cached_article['fetch_status'] == 'success'
+                         cached_article
+                       else
+                         attempt
+                       end
+                     end
+                   else
+                     cached_article || extract_article_simple(article_url, read_timeout: simple_timeout)
+                   end
+
+                 else # :renderer
+                   if cached_article && cached_article['fetch_status'] == 'success' && cached_article['url'] == article_url && !force
+                     cached_article
+                   else
+                     extract_article(article_url)
+                   end
+                 end
+
   post_data['article_fetch_status'] = article_data['fetch_status']
+  post_data['article_fetched_at'] = article_data['fetched_at'] if article_data['fetched_at']
 
   comments_data = { 'comments' => disc.comments }
 
@@ -390,7 +589,7 @@ def print_result_line(result)
   article_chars = (article && article['content']) ? article['content'].length : 0
 
   parts = []
-  parts << "✓ #{id} \"#{title[0, 60]}\" (#{score} pts)"
+  parts << "#{id} \"#{title[0, 60]}\" (#{score} pts)"
   parts << "raw:#{raw_count} active:#{active_count}#{active_count == 0 ? ' ⚠' : ''}"
 
   case astat
@@ -402,37 +601,119 @@ def print_result_line(result)
   when 'unknown'      then parts << 'article unknown'
   end
 
-  puts "  #{parts.join(' — ')}"
+  $print_mutex.synchronize do
+    puts "  #{parts.join(' — ')}"
+  end
 end
 
 # ── stories index writer ──
 
-def write_stories_index(stories, cache_root)
-  dir = post_cache_dir('_index_')
-  FileUtils.mkdir_p(File.dirname(dir))
-  index_file = File.join(File.dirname(dir), 'stories.yaml')
-  File.write(index_file, YAML.dump({
+def write_stories_index(stories)
+  path = stories_index_path
+  FileUtils.mkdir_p(File.dirname(path))
+  File.write(path, YAML.dump({
     'fetched_at' => Time.now.utc.iso8601,
     'stories' => stories
   }))
 end
 
+# ── Parallel processing ──
+
+def process_stories_parallel(stories, force: false, article_mode: :renderer,
+                             jobs: 5, simple_timeout: 20)
+  queue = Queue.new
+  stories.each { |s| queue << s }
+  results_queue = Queue.new
+
+  workers = Array.new(jobs) do
+    Thread.new do
+      loop do
+        story = queue.pop(true) rescue nil
+        break unless story
+        status, result, err = fetch_and_cache(
+          story['hn_url'],
+          known_meta: story,
+          force: force,
+          article_mode: article_mode,
+          simple_timeout: simple_timeout,
+        )
+        results_queue << { status: status, result: result, err: err, story: story }
+      end
+    end
+  end
+
+  workers.each(&:join)
+
+  stats = { fetched: 0, cached: 0, articles_ok: 0, errors: 0, error_details: [] }
+
+  until results_queue.empty?
+    entry = results_queue.pop(true) rescue nil
+    break unless entry
+
+    case entry[:status]
+    when :cached
+      stats[:cached] += 1
+      print_result_line(entry[:result])
+    when :fetched
+      stats[:fetched] += 1
+      print_result_line(entry[:result])
+      stats[:articles_ok] += 1 if entry[:result]&.dig('article', 'fetch_status') == 'success'
+    when :error
+      stats[:errors] += 1
+      stats[:error_details] << "  ✗ #{entry[:story]['id']}: #{entry[:err]}"
+    end
+  end
+
+  stats
+end
+
 # ── CLI ──
 
 def run
-  options = { mode: nil, url: nil, force: false, max: MAX_DEFAULT, output: nil }
+  options = {
+    mode: nil, url: nil, force: false, max: MAX_DEFAULT, output: nil,
+    jobs: 5, fetch_articles_simple: false, skip_articles: false,
+    timeout: 20
+  }
+
   OptionParser.new do |opts|
     opts.banner = "Usage: ruby scripts/hn-fetch.rb [options]"
     opts.on('--best', 'Fetch HN /best page') { options[:mode] = :best }
     opts.on('--url URL', 'Fetch single HN post') { |v| options[:mode] = :url; options[:url] = v }
+    opts.on('--fetch-article-url URL', 'Fetch single article URL, print content to stdout, exit') { |v|
+      options[:mode] = :fetch_article_url; options[:url] = v
+    }
     opts.on('--max N', Integer, "Max posts to fetch (default: #{MAX_DEFAULT})") { |v| options[:max] = v }
     opts.on('--force', 'Force re-fetch, ignore cache') { options[:force] = true }
+    opts.on('--jobs N', Integer, "Parallel workers (default: 5)") { |v| options[:jobs] = v }
+    opts.on('--fetch-articles-simple', 'Use simple HTTP fetch (no renderer) for articles') {
+      options[:fetch_articles_simple] = true
+    }
+    opts.on('--skip-articles', 'Skip article fetching entirely') {
+      options[:skip_articles] = true
+    }
+    opts.on('--timeout N', Integer, "Read timeout in seconds for simple article fetch (default: 20)") { |v|
+      options[:timeout] = v
+    }
     opts.on('--output DIR', "Cache root (#{CACHE_DIR})") { |v| options[:output] = v }
     opts.on('-h', '--help') { puts opts; exit }
   end.parse!
 
+  # ── --fetch-article-url mode: single URL to stdout ──
+  if options[:mode] == :fetch_article_url
+    result = extract_article_simple(options[:url],
+                                    open_timeout: 8, read_timeout: options[:timeout])
+    if result['fetch_status'] == 'success'
+      puts result['content']
+    else
+      warn "ERROR: #{result['error'] || result['fetch_status']}"
+      exit 1
+    end
+    return
+  end
+
   unless options[:mode]
-    warn "ERROR: use --best or --url"
+    warn "ERROR: use --best, --url, or --fetch-article-url"
     exit 1
   end
 
@@ -441,15 +722,24 @@ def run
   puts "HN Data Fetcher"
   puts "Mode: #{options[:mode]}"
   puts "Date: #{now.strftime('%Y-%m-%d %H:%M UTC')}"
+  puts "Jobs: #{options[:jobs]}"
   puts "=" * 50
 
+  # ── --url mode: single HN post ──
   if options[:mode] == :url
     unless options[:url].match?(/news\.ycombinator\.com/)
       warn "ERROR: expected HN URL"
       exit 1
     end
+    article_mode = options[:skip_articles] ? :skip :
+                   options[:fetch_articles_simple] ? :simple : :renderer
     puts "\nFetching..."
-    status, result, err = fetch_and_cache(options[:url], force: options[:force])
+    status, result, err = fetch_and_cache(
+      options[:url],
+      force: options[:force],
+      article_mode: article_mode,
+      simple_timeout: options[:timeout],
+    )
     if status == :error
       warn "ERROR: #{err}"
       exit 1
@@ -459,10 +749,11 @@ def run
     return
   end
 
+  # ── --best mode ──
   puts "\n[1/3] Fetching HN best page (API)..."
   stories = fetch_stories
   puts "  #{stories.length} stories"
-  write_stories_index(stories, options[:output] || CACHE_DIR)
+  write_stories_index(stories)
 
   stories.first(10).each do |s|
     url_tag = s['url'] ? ' [link]' : ' [text]'
@@ -473,37 +764,25 @@ def run
     puts "    ... and #{stories.length - 10} more"
   end
 
-  puts "\n[2/3] Fetching discussions..."
-  fetched = 0
-  cached = 0
-  articles_ok = 0
-  errors = 0
+  article_mode = options[:skip_articles] ? :skip :
+                 options[:fetch_articles_simple] ? :simple : :renderer
 
-  stories.each_with_index do |story, i|
-    status, result, err = fetch_and_cache(
-      story['hn_url'],
-      known_meta: story,
-      force: options[:force]
-    )
+  puts "\n[2/3] Fetching discussions... (parallel: #{options[:jobs]} workers, article mode: #{article_mode})"
 
-    case status
-    when :cached
-      cached += 1
-      print_result_line(result)
-    when :fetched
-      fetched += 1
-      print_result_line(result)
-      articles_ok += 1 if result && result.dig('article', 'fetch_status') == 'success'
-    when :error
-      errors += 1
-      warn "  ✗ #{story['id']}: #{err}"
-    end
+  stats = process_stories_parallel(
+    stories,
+    force: options[:force],
+    article_mode: article_mode,
+    jobs: options[:jobs],
+    simple_timeout: options[:timeout],
+  )
+
+  unless stats[:error_details].empty?
+    stats[:error_details].each { |line| warn line }
   end
 
   puts "\n---"
-  puts "Summary: #{fetched} fetched, #{cached} cached, #{articles_ok} articles, #{errors} errors"
-ensure
-  $hn_http&.finish rescue nil
+  puts "Summary: #{stats[:fetched]} fetched, #{stats[:cached]} cached, #{stats[:articles_ok]} articles, #{stats[:errors]} errors"
 end
 
 run

@@ -159,6 +159,16 @@ No hacky/clickbait: 震惊, 惊人, 万万没想到. Movies/books: spoiler-free,
 
 Must anchor to actual article facts (event/viewpoint). Never fabricate. Not displayed externally — lives in front matter, indexed via `<a title="...">`.
 
+### Article content sufficiency check (before writing)
+
+After reading `article.yaml`, check `content` field length:
+- `< 2000 chars` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<article_url>" --timeout 30` to attempt fuller fetch
+- `2000..4000 chars` → **SHOULD** run the same command
+- `> 4000 chars` → **MAY** proceed directly
+
+If the fetch succeeds (exit 0), use the stdout content as supplementary context.
+If it fails (exit 1), proceed with existing cached content.
+
 ### Article structure (fixed order)
 1. **原文概要** — context intro, 2-5 paragraphs. Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)"
 2. **讨论焦点** — key themes in `###` sections. Each blockquote followed by CN translation:
