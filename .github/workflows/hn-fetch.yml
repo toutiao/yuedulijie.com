@@ -18,7 +18,7 @@ jobs:
       - uses: ./.github/actions/hn-cache/restore
 
       - name: Fetch HN data (simple HTTP)
-        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
 
       - uses: ./.github/actions/hn-cache/save
 
