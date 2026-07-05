@@ -124,7 +124,7 @@ Load `chinese-writing-style` skill before writing.
 ---
 layout: post
 title: "Topic — HN discussion digest"
-date: $(date +%Y-%m-%d)
+date: $(TZ=Asia/Shanghai date +%Y-%m-%d)
 categories: [articles]
 excerpt: >-
   一句话摘要（1-2 句，~80 字）
@@ -134,7 +134,7 @@ tagline: >-
 ```
 ⚠ `excerpt` / `tagline` 使用 YAML block scalar `>-`，内容中的 ASCII 双引号 `"` 会被 YAML 解析为字符串终止。若文本内需要引号，用中文书名号《》或转义 `\"`。
 
-⚠ `date` must be auto-filled via `$(date +%Y-%m-%d)`. Never enter manually.
+⚠ `date` must be auto-filled via `$(TZ=Asia/Shanghai date +%Y-%m-%d)`. Never enter manually.
 
 ### excerpt rules
 | Article length | Style | Example |
@@ -236,7 +236,7 @@ After quote verification, scan article body (including blockquotes, excluding di
 
 1. Save article to `_articles/`
 2. Validate date field:
-   - `grep "date: $(date +%Y-%m-%d)"` article file
+   - `grep "date: $(TZ=Asia/Shanghai date +%Y-%m-%d)"` article file
    - Match → continue
    - Mismatch → error "date field mismatch", auto-correct to today
 3. Build:
@@ -247,7 +247,7 @@ After quote verification, scan article body (including blockquotes, excluding di
 
 | Tag | Action |
 |-----|--------|
-| Normal (no tag) | `git add -A && git commit -m "feat: HN 自动摘要 $(date +%Y-%m-%d)"` (CI will push) |
+| Normal (no tag) | `git add -A && git commit -m "feat: HN 自动摘要 $(TZ=Asia/Shanghai date +%Y-%m-%d)"` (CI will push) |
 | Flagged (`⚑` sensitive or `⚑` political context) | Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only." → commit same as normal + show warning: "⚠ Sensitive article deployed. Review recommended." |
 
 Exit 0 on success. No user prompts.
