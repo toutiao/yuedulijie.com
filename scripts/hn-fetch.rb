@@ -20,7 +20,6 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
-require 'thwait'
 
 RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 
