@@ -196,7 +196,7 @@ If it fails (exit 1), proceed with existing cached content.
 | Source annotation (cluster) | `> "text" — user [thread 2]` |
 
 ### Naming
-`_articles/YYYY-MM-DD-hn-keywords.md`
+`_articles/YYYY/YYYY-MM-DD-hn-keywords.md`
 
 ### AI model disclosure
 Append to disclaimer:
