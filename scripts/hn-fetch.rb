@@ -21,6 +21,7 @@ require 'date'
 require 'fileutils'
 require 'optparse'
 require 'time'
+require 'set'
 
 RENDERER_URL = ENV.fetch('RENDERER_URL', 'http://localhost:3000')
 
@@ -688,6 +689,11 @@ end
 # ── stories index writer ──
 
 def write_stories_index(stories)
+  if stories.nil? || stories.empty?
+    puts "  No stories to write. Preserving existing stories.yaml."
+    return
+  end
+
   existing_ids = Dir.glob('_articles/**/*.md').flat_map { |f|
     File.read(f).scan(/item\?id=(\d+)/).flatten
   }.uniq
