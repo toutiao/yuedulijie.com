@@ -140,7 +140,7 @@
       "agent": "content-manager"
     },
     "hn": {
-      "template": "Load hn-discussion-summary skill. If URL given -> Phase 1-3 (skip scan). If no URL -> Phase 0 (scan HN best) -> show candidates -> user pick -> Phase 1-3. After write: bundle exec jekyll build -> ask deploy.",
+      "template": "Load hn-discussion-summary skill and caveman skill. If URL given -> Phase 1-3 (skip scan). If no URL -> Phase 0 (scan HN best) -> show candidates -> user pick -> Phase 1-3. After write: bundle exec jekyll build -> ask deploy.",
       "description": "Create HN discussion summary article",
       "agent": "hn-summarizer"
     }

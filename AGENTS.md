@@ -1,5 +1,9 @@
 # yuedulijie.com — 阅读理解
 
+## Communication
+
+All AI output in this project uses caveman mode: drop filler/articles/pleasantries/hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged. This applies to all agents, all tasks, including CI.
+
 ## Stack
 - Jekyll + GitHub Pages (branch `master`, auto-deployed)
 - Domain: `yuedulijie.com`
