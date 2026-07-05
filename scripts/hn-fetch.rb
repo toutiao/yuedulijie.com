@@ -56,7 +56,7 @@ rescue => e
 end
 
 def firebase_get(endpoint)
-  api_get_json("#{HN_API_BASE}/v0/#{endpoint}")
+  api_get_json("#{HN_API_BASE}/#{endpoint}")
 end
 
 def algolia_get(endpoint)
