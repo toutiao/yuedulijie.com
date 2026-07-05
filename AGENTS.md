@@ -4,7 +4,7 @@
 
 All AI output in this project uses caveman mode: drop filler/articles/pleasantries/hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged. This applies to all agents, all tasks, including CI.
 
-## Stack
+**Exception: generated article content.** Chinese summary articles (`_articles/`) stay normal expressive CN. Caveman is for AI ↔ human communication, not published content.
 - Jekyll + GitHub Pages (branch `master`, auto-deployed)
 - Domain: `yuedulijie.com`
 - **Local dev**: Docker (ruby:3.2-slim, `docker compose`), **no** local Ruby/Jekyll needed

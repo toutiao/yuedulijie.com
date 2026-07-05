@@ -174,6 +174,8 @@ Same Step 2-4.
 Load `chinese-writing-style` first.
 (引文原文不受 style 约束. 翻译和讨论段受约束.)
 
+> caveman mode applies to AI communication only. Article body stays normal expressive CN.
+
 **Re-read full RD** before writing. Ensure all details + quotes in working memory.
 
 ### Front matter
