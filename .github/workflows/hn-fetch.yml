@@ -1,11 +1,31 @@
-name: HN Data Fetcher
+name: HN Data Fetcher + Article Filler
 on:
   schedule:
-    - cron: "0 1,9,17 * * *"
+    - cron: "0 0,8,16 * * *"
   workflow_dispatch:
 
 jobs:
   fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - uses: ./.github/actions/hn-cache/restore
+
+      - name: Fetch HN data (simple HTTP)
+        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+
+      - uses: ./.github/actions/hn-cache/save
+        with:
+          suffix: fetch
+
+  fill:
+    needs: fetch
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
@@ -15,7 +35,22 @@ jobs:
 
       - uses: ./.github/actions/hn-cache/restore
 
-      - name: Fetch HN data
-        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+      - name: Fill missing articles (renderer)
+        run: |
+          if ! curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+            docker compose build renderer 2>&1 | tail -1
+            docker compose up -d renderer 2>&1
+            for i in $(seq 1 10); do
+              curl -sf http://localhost:3000/health >/dev/null && break
+              sleep 2
+            done
+          fi
+          if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+            ruby scripts/hn-fetch.rb --fill-missing --jobs 3
+          else
+            echo "Renderer unavailable. Skipping fill."
+          fi
 
       - uses: ./.github/actions/hn-cache/save
+        with:
+          suffix: fill

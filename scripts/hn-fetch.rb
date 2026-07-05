@@ -667,6 +667,128 @@ def process_stories_parallel(stories, force: false, article_mode: :renderer,
   stats
 end
 
+# ── Fill missing articles (renderer) ──
+
+def fill_missing_articles(jobs: 3)
+  yr, wk = week_key
+  week_dir = File.join(CACHE_DIR, yr, wk)
+
+  unless Dir.exist?(week_dir)
+    puts "No cache found at #{week_dir}"
+    return
+  end
+
+  Dir.glob(File.join(week_dir, '*', '*.tmp')).each { |f| File.delete(f) rescue nil }
+
+  post_dirs = Dir.glob(File.join(week_dir, '*', 'post.yaml')).map { |f| File.dirname(f) }
+  puts "Scanning #{post_dirs.length} posts..."
+
+  to_fill = []
+  post_dirs.each do |dir|
+    post_id = File.basename(dir)
+    article_path = File.join(dir, 'article.yaml')
+
+    status = if File.exist?(article_path)
+               begin
+                 YAML.safe_load_file(article_path, permitted_classes: [Time])['fetch_status']
+               rescue
+                 'error'
+               end
+             else
+               'missing'
+             end
+
+    case status
+    when 'success'
+      puts "  #{post_id}: success, skip"
+    when 'skipped'
+      puts "  #{post_id}: skipped (no URL), skip"
+    when 'missing'
+      puts "  #{post_id}: missing article.yaml, needs fill"
+      to_fill << dir
+    else
+      puts "  #{post_id}: #{status}, needs fill"
+      to_fill << dir
+    end
+  end
+
+  if to_fill.empty?
+    puts "All articles have 'success' status. Nothing to fill."
+    return
+  end
+
+  puts "Found #{to_fill.length} articles to fill"
+
+  ru = RENDERER_URL
+  begin
+    resp = Net::HTTP.get_response(URI("#{ru}/health"))
+    unless resp.code.to_i == 200
+      puts "Renderer unhealthy (HTTP #{resp.code}). Skip fill."
+      return
+    end
+  rescue => e
+    puts "Renderer unreachable: #{e.message}. Skip fill."
+    return
+  end
+  puts "Renderer healthy."
+
+  queue = Queue.new
+  to_fill.each { |d| queue << d }
+  results_mutex = Mutex.new
+  results = { filled: 0, skipped: 0, errors: 0 }
+
+  threads = Array.new([jobs, to_fill.length].min) do
+    Thread.new do
+      loop do
+        dir = queue.pop(true) rescue nil
+        break unless dir
+        fill_one_article(dir, results, results_mutex)
+      end
+    end
+  end
+
+  threads.each(&:join)
+
+  puts "\nFill summary: #{results[:filled]} filled, #{results[:skipped]} skipped, #{results[:errors]} errors"
+end
+
+def fill_one_article(dir, results, mutex)
+  post_path = File.join(dir, 'post.yaml')
+  post = YAML.safe_load_file(post_path, permitted_classes: [Time])
+  post_id = post['id']
+  article_url = post['article_url'] || post['url']
+
+  unless article_url
+    mutex.synchronize { results[:skipped] += 1 }
+    puts "  #{post_id}: no URL, skip"
+    return
+  end
+
+  puts "  #{post_id}: fetching #{article_url[0, 80]}..."
+
+  article = extract_article(article_url)
+
+  if article['fetch_status'] == 'success' && article['content'] && !article['content'].strip.empty?
+    article_path = File.join(dir, 'article.yaml')
+    tmp_path = article_path + '.tmp'
+    File.write(tmp_path, YAML.dump(article))
+    File.rename(tmp_path, article_path)
+
+    post['article_fetch_status'] = 'success'
+    post['article_fetched_at'] = article['fetched_at']
+    File.write(post_path, YAML.dump(post))
+
+    chars = article['content'].length
+    puts "  #{post_id}: filled (#{chars} chars)"
+    mutex.synchronize { results[:filled] += 1 }
+  else
+    reason = article['fetch_status'] || 'unknown'
+    reason = 'empty content' if article['fetch_status'] == 'success' && (!article['content'] || article['content'].strip.empty?)
+    puts "  #{post_id}: renderer failed (#{reason})"
+    mutex.synchronize { results[:errors] += 1 }
+  end
+end
+
 # ── CLI ──
 
 def run
@@ -695,6 +817,9 @@ def run
     opts.on('--timeout N', Integer, "Read timeout in seconds for simple article fetch (default: 20)") { |v|
       options[:timeout] = v
     }
+    opts.on('--fill-missing', 'Scan cache and fill missing articles via renderer') {
+      options[:mode] = :fill_missing
+    }
     opts.on('--output DIR', "Cache root (#{CACHE_DIR})") { |v| options[:output] = v }
     opts.on('-h', '--help') { puts opts; exit }
   end.parse!
@@ -712,8 +837,14 @@ def run
     return
   end
 
+  # ── --fill-missing mode ──
+  if options[:mode] == :fill_missing
+    fill_missing_articles(jobs: options[:jobs])
+    return
+  end
+
   unless options[:mode]
-    warn "ERROR: use --best, --url, or --fetch-article-url"
+    warn "ERROR: use --best, --url, --fetch-article-url, or --fill-missing"
     exit 1
   end
 

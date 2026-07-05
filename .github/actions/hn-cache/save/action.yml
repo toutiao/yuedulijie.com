@@ -1,5 +1,10 @@
 name: 'Save HN data cache'
 description: 'Save current week HN data directory to GH Actions cache'
+inputs:
+  suffix:
+    description: 'Optional suffix for cache key (e.g. "fetch", "fill")'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -8,8 +13,13 @@ runs:
       run: |
         YR=$(date -u +%G)
         WK=W$(date -u +%V)
+        SUFFIX='${{ inputs.suffix }}'
+        if [ -n "$SUFFIX" ]; then
+          echo "key=hn-data-$YR$WK-${{ github.run_id }}-$SUFFIX" >> $GITHUB_OUTPUT
+        else
+          echo "key=hn-data-$YR$WK-${{ github.run_id }}" >> $GITHUB_OUTPUT
+        fi
         echo "dir=_data/hn/$YR/$WK" >> $GITHUB_OUTPUT
-        echo "key=hn-data-$YR$WK-${{ github.run_id }}" >> $GITHUB_OUTPUT
     - uses: actions/cache/save@v4
       with:
         path: ${{ steps.info.outputs.dir }}
