@@ -210,6 +210,7 @@ ruby scripts/hn-fetch.rb --best [--max N] [--force] [--jobs N]
                           [--fetch-articles-simple] [--skip-articles] [--timeout N]
 ruby scripts/hn-fetch.rb --url <hn_url> [--force] [--fetch-articles-simple] [--skip-articles]
 ruby scripts/hn-fetch.rb --fetch-article-url <url> [--timeout N]  # AI 补充用
+ruby scripts/hn-fetch.rb --fill-missing [--jobs N]   # renderer 补充抓取
 ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 ```
 
@@ -221,6 +222,7 @@ ruby scripts/hn-fetch.rb --output <dir>  # 默认 _data/hn
 4. 缓存命中检查：`post.yaml` 存在且 `raw_comment_count` 未变 → 跳过
 5. `--force` 忽略缓存，强制重新抓取
 6. 文章提取分两模式：`:simple` (纯HTTP, 含质量门禁) 和 `:renderer` (Playwright, 需renderer服务)
+7. `--fill-missing`: 扫描缓存，只处理 `fetch_status` 非 `success`/`skipped` 的文章。renderer 对 thin content（<2000 chars）无改善效果（实测27篇仅+595 chars），不处理成功状态
 
 ### stdout 输出
 
@@ -255,25 +257,54 @@ Skill Phase 2 增加文章内容充分性检查（见 SKILL.md）：
 
 ### `hn-fetch.yml` — 自托管 runner，每日 3 次数据缓存
 
+### `hn-fetch.yml` — 双 job：fetch (ubuntu) + fill (self-hosted, renderer)
+
 ```yaml
-name: HN Data Fetcher
+name: HN Data Fetcher + Article Filler
 on:
   schedule:
-    - cron: "0 1,9,17 * * *"
+    - cron: "0 0,8,16 * * *"
   workflow_dispatch:
 
 jobs:
   fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.2", bundler-cache: true }
+      - uses: ./.github/actions/hn-cache/restore
+      - name: Fetch HN data (simple HTTP)
+        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+      - uses: ./.github/actions/hn-cache/save
+
+  fill:
+    needs: fetch
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
       - name: Install Ruby deps
         run: gem install nokogiri reverse_markdown 2>&1 | tail -3
       - uses: ./.github/actions/hn-cache/restore
-      - name: Fetch HN data
-        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5
+      - name: Fill missing articles (renderer)
+        run: |
+          if ! curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+            docker compose build renderer 2>&1 | tail -1
+            docker compose up -d renderer 2>&1
+            for i in $(seq 1 10); do
+              curl -sf http://localhost:3000/health >/dev/null && break
+              sleep 2
+            done
+          fi
+          if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+            ruby scripts/hn-fetch.rb --fill-missing --jobs 3
+          else
+            echo "Renderer unavailable. Skipping fill."
+          fi
       - uses: ./.github/actions/hn-cache/save
 ```
+
+Cache key 使用 `github.job` 自动后缀（`hn-data-{YR}{WK}-{run_id}-fetch` / `hn-data-{YR}{WK}-{run_id}-fill`），通过 `restore-keys` 前缀匹配保证 hn-auto.yml 恢复最新数据。
 
 ### `hn-auto.yml` — GitHub ubuntu-latest，每日 02:00 UTC 生成
 
@@ -331,7 +362,7 @@ jobs:
       - uses: ./.github/actions/setup-opencode
       - uses: ./.github/actions/hn-cache/restore
       - name: Fresh fetch discussions + articles (simple HTTP)
-        run: ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
+        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
       - name: Generate articles (opencode auto)
         env:
           GOOGLE_GENERATIVE_AI_API_KEY: "\${{ secrets.GEMINI_API_KEY }}"
