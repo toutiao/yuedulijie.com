@@ -100,6 +100,7 @@ jobs:
           fi
 
       - name: Generate articles (opencode auto)
+        timeout-minutes: 8
         env:
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
