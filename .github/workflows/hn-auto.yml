@@ -17,19 +17,17 @@ on:
           - "google/gemini-3.5-flash"
           - "deepseek/deepseek-v4-flash"
       mode:
-        description: "运行模式 — auto 自动选择 / url 手动指定"
+        description: "运行模式 — auto / url"
         type: choice
         required: false
         default: "auto"
-        options:
-          - "auto"
-          - "url"
+        options: [auto, url]
       hn_url:
-        description: "HN 讨论 URL（mode=url 时必填）"
+        description: "HN URL（mode=url 必填）"
         required: false
         default: ""
       force_fetch:
-        description: "强制重新抓取，忽略缓存"
+        description: "忽略缓存重新抓取"
         type: boolean
         required: false
         default: false
@@ -51,24 +49,20 @@ jobs:
           ruby-version: "3.2"
           bundler-cache: true
 
-      - name: Configure Git
+      - name: Config git
         env:
           PAT: ${{ secrets.PAT_FOR_DEPLOY }}
         run: |
           git config user.name "HN Auto-Summarizer"
           git config user.email "hn-auto@yuedulijie.com"
-          git config --add http.https://github.com/.extraheader \
-            "AUTHORIZATION: basic $(printf '%s:' "$PAT" | base64 -w0)"
           git remote set-url origin "https://github.com/${{ github.repository }}"
 
       - uses: ./.github/actions/setup-opencode
 
       - uses: ./.github/actions/hn-cache/restore
 
-      - name: Fresh fetch discussions + articles (simple HTTP)
-        run: |
-          echo "Fetching fresh data before generation..."
-          bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
+      - name: Fetch fresh data
+        run: bundle exec ruby scripts/hn-fetch.rb --best --max 15 --fetch-articles-simple --jobs 5 --timeout 20
 
       - name: Check API keys
         env:
@@ -76,16 +70,11 @@ jobs:
           DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           echo "=== Google Gemini ==="
-          if [ -n "$GOOGLE_KEY" ]; then
-            for model in gemini-2.5-flash gemini-2.5-flash-lite \
-                         gemini-3.1-flash-lite gemini-3.5-flash; do
-              CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-                "https://generativelanguage.googleapis.com/v1/models/$model?key=$GOOGLE_KEY")
-              printf "  %-30s %s\n" "$model" "$CODE"
-            done
-          else
-            echo "  no key"
-          fi
+          [ -n "$GOOGLE_KEY" ] && for m in gemini-2.5-flash gemini-2.5-flash-lite \
+            gemini-3.1-flash-lite gemini-3.5-flash; do
+            curl -s -o /dev/null -w "$m %{http_code}\n" \
+              "https://generativelanguage.googleapis.com/v1/models/$m?key=$GOOGLE_KEY"
+          done || echo "  no key"
           echo "=== DeepSeek ==="
           if [ -n "$DEEPSEEK_KEY" ]; then
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -97,50 +86,34 @@ jobs:
             echo "  no key"
           fi
 
-      - name: Generate articles (opencode auto)
+      - name: Generate
         env:
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          # Clean up any orphaned _articles/ from previous failed run
           git checkout -- _articles/ 2>/dev/null || true
           git clean -fd _articles/ 2>/dev/null || true
-          MODEL='${{ inputs.model }}'
-          if [ -z "$MODEL" ]; then MODEL='deepseek/deepseek-v4-flash'; fi
-          MODE='${{ inputs.mode }}'
-          HN_URL='${{ inputs.hn_url }}'
-          FORCE='${{ inputs.force_fetch }}'
-          FLAGS=""
-          [ "$FORCE" = "true" ] && FLAGS="--force"
-          if [ "$MODE" = "url" ]; then
-            if [ -z "$HN_URL" ]; then
-              echo "ERROR: mode=url 但 hn_url 为空"
-              exit 1
-            fi
-            HN_CMD="/hn $HN_URL $FLAGS"
+          M='${{ inputs.model }}'; M=${M:-deepseek/deepseek-v4-flash}
+          F='${{ inputs.force_fetch }}'; FLAGS=""; [ "$F" = "true" ] && FLAGS="--force"
+          if [ '${{ inputs.mode }}' = "url" ]; then
+            U='${{ inputs.hn_url }}'; [ -z "$U" ] && { echo "ERROR: mode=url but hn_url empty"; exit 1; }
+            C="/hn $U $FLAGS"
           else
-            HN_CMD="/hn --auto $FLAGS"
+            C="/hn --auto $FLAGS"
           fi
-          opencode run "$HN_CMD" --dir . \
-            --dangerously-skip-permissions \
-            --model "$MODEL" --print-logs 2>&1
+          opencode run "$C" --dir . --dangerously-skip-permissions --model "$M" --print-logs 2>&1
 
       - name: Show changes
         run: |
-          echo "=== Articles ==="
           ls -la _articles/ 2>/dev/null | tail -5 || echo "(empty)"
-          echo "=== Git status ==="
           git status --short -- _articles/ 2>/dev/null || true
 
-      - name: Validate Jekyll build
+      - name: Validate Jekyll
         run: bundle exec jekyll build
 
       - name: Push to master
         run: |
           git add -A _articles/
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-          else
+          git diff --cached --quiet && echo "Nothing to commit" || \
             git commit -m "feat: HN 自动摘要 $(TZ=Asia/Shanghai date +%Y-%m-%d)"
-          fi
           git push
