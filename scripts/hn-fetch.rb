@@ -238,7 +238,12 @@ def extract_article(url)
     markdown = markdown.gsub(/\n{3,}/, "\n\n").strip
 
     result['content'] = markdown[0, ARTICLE_TRUNCATE]
-    result['fetch_status'] = 'success'
+    if result['content'] && result['content'].length >= MIN_ARTICLE_CHARS
+      result['fetch_status'] = 'success'
+    else
+      result['fetch_status'] = 'error'
+      result['error'] = "insufficient content (#{(result['content'] || '').length} chars)"
+    end
   rescue => e
     msg = e.message || ''
     if msg.include?('403') || msg.include?('Forbidden')
@@ -384,7 +389,12 @@ def extract_article_simple(url, open_timeout: 10, read_timeout: 20)
     markdown = markdown.gsub(/\n{3,}/, "\n\n").strip
 
     result['content'] = markdown[0, ARTICLE_TRUNCATE]
-    result['fetch_status'] = 'success'
+    if result['content'] && result['content'].length >= MIN_ARTICLE_CHARS
+      result['fetch_status'] = 'success'
+    else
+      result['fetch_status'] = 'error'
+      result['error'] = "insufficient content (#{(result['content'] || '').length} chars)"
+    end
   rescue Net::OpenTimeout, Net::ReadTimeout => e
     result.merge('fetch_status' => 'error', 'error' => "timeout: #{e.message[0, 100]}")
   rescue => e
