@@ -534,22 +534,28 @@ def fetch_and_cache(hn_url, known_meta: nil, force: false, article_mode: :render
                  when :skip
                    cached_article || { 'fetch_status' => 'skipped' }
 
-                 when :simple
-                   domain = URI.parse(article_url.to_s).host rescue nil
-                   if domain
-                     with_domain(domain) do
-                       attempt = extract_article_simple(article_url, read_timeout: simple_timeout)
-                       if attempt['fetch_status'] == 'success'
-                         attempt
-                       elsif cached_article && cached_article['fetch_status'] == 'success'
-                         cached_article
-                       else
-                         attempt
-                       end
-                     end
-                   else
-                     cached_article || extract_article_simple(article_url, read_timeout: simple_timeout)
-                   end
+                  when :simple
+                    domain = URI.parse(article_url.to_s).host rescue nil
+                    if domain
+                      with_domain(domain) do
+                        attempt = extract_article_simple(article_url, read_timeout: simple_timeout)
+                        if attempt['fetch_status'] == 'success'
+                          attempt_len = (attempt['content'] || '').length
+                          cached_len = (cached_article && cached_article['fetch_status'] == 'success' && cached_article['content']) ? cached_article['content'].length : 0
+                          if attempt_len < 1000 && cached_len > attempt_len
+                            cached_article
+                          else
+                            attempt
+                          end
+                        elsif cached_article && cached_article['fetch_status'] == 'success' && cached_article['content']
+                          cached_article
+                        else
+                          attempt
+                        end
+                      end
+                    else
+                      cached_article || extract_article_simple(article_url, read_timeout: simple_timeout)
+                    end
 
                  else # :renderer
                    if cached_article && cached_article['fetch_status'] == 'success' && cached_article['url'] == article_url && !force
