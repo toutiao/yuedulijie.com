@@ -6,189 +6,175 @@ metadata:
   collection: articles
 ---
 
-## Mode Detection
+## Mode
 
 | Condition | Mode |
 |-----------|------|
-| `--auto` flag OR env `CI=true` / `GITHUB_ACTIONS=true` | **auto** — no prompts, auto-decide, auto-build, auto-deploy |
-| Otherwise | **interactive** — user prompts, confirm deploy |
+| `--auto` / `CI=true` / `GITHUB_ACTIONS=true` | **auto** — no prompts, auto-decide, auto-build, auto-deploy |
+| else | **interactive** — user prompts, confirm deploy |
 
 ---
 
-## Phase 0 — Scan (no URL given)
+## Phase 0 — Scan
 
-### All modes — Story filtering
-Stories must pass all:
+### Filters (all modes)
+Story pass all:
 - score >= 80
-- item id not in `_articles/*.md` (dedup)
-- same topic not covered today (grep today's date + keyword in existing articles)
+- ID not in `_articles/*.md`
+- same topic not covered today (grep date + keyword in existing articles)
 
-> `stories.yaml` 已由 `hn-fetch.rb` 在写入时做过一次 dedup（过滤已出现在 `_articles/` 中的 HN ID）。此处为第二层检查，防止脚本层漏网。
+> `hn-fetch.rb` already dedup at write time (filter IDs in `_articles/`). This is 2nd layer.
 
 ### Auto mode
-1. Source: Read cached stories from `_data/hn/`
-   - `glob _data/hn/*/W*/stories.yaml` → pick newest week
-   - `read` file → extract `stories` array (each has: id, title, score, hn_url, author, descendants)
-2. Apply filters (All modes section)
-3. Sort by score descending
-4. Auto-select top candidate
-5. Report: "Auto-selected: [title] ([score] pts)"
-6. Proceed to Phase 0.5
-7. Fallback: if no cached data, `webfetch` https://news.ycombinator.com/best?h=48
+1. Read `_data/hn/*/W*/stories.yaml` → pick newest week
+2. Apply filters
+3. Sort by score desc
+4. Pick top candidate
+5. Report: `Auto-selected: [title] ([score] pts)`
+6. Go to Phase 0.5
+7. Fallback: `webfetch https://news.ycombinator.com/best?h=48`
 
 ### Interactive mode
-1. Source: `webfetch` https://news.ycombinator.com/best?h=48 (text format)
-2. Parse stories: title + score + item URL
-3. Apply filters (All modes section)
-4. For each candidate, detect political context: title matches political keywords (election, protest, war, sanction, human rights, etc.)
-   - If match: append `⚑ political context` tag
-5. Show top 5 candidates:
+1. `webfetch https://news.ycombinator.com/best?h=48` (text)
+2. Parse id + title + score
+3. Apply filters
+4. Political match → tag `⚑ political context`
+5. Show top 5:
 
    ```
    HN hot candidates:
    [1] Title (N pts)
-   [2] Title (N pts) ⚑ political context
    ...
-
    Input: number / URL / "n" to skip
    ```
 
 ---
 
-## Phase 0.5 — Cluster Detection
+## Phase 0.5 — Cluster
 
-### All modes — Keyword derivation
-From selected post title: drop leading common words (Claude, new, update, Introducing) → take first remaining meaningful token.
+### Keyword
+Drop leading common words (Claude, new, update, Introducing) → first meaningful token.
 
-### Auto mode
-1. Scan remaining candidates (from Phase 0) for same keyword, score >= 80, not self
-2. If >= 2 related posts → **cluster mode** (include all)
-3. If < 2 → **single post mode**
-4. Report: "Mode: [cluster/single], including N posts"
+### Auto
+1. Scan candidates for same keyword, score >= 80, not self
+2. >= 2 related → **cluster mode** (include all)
+3. < 2 → **single post mode**
+4. Report: `Mode: [cluster/single], N posts`
 
-### Interactive mode
-1. `webfetch` HN source page (html format):
-   - Topic from `/best` → `https://news.ycombinator.com/best?h=48`
-   - Topic from `/news` → start at `/news`, follow "morelink" until score < 80 or age > 48h (parse "X hours ago" / "X days ago")
-2. Parse `<tr class="athing">`: extract `id` + title + score
-3. Filter by keyword (derived above), score >= 80, not self
-4. If >= 2 matches → show:
+### Interactive
+1. `webfetch` HN source (html):
+   - `/best` → `https://news.ycombinator.com/best?h=48`
+   - `/news` → start `/news`, follow "morelink" till score < 80 or age > 48h
+2. Parse `<tr class="athing">`: id + title + score
+3. Filter by keyword, score >= 80, not self
+4. >= 2 → show:
 
    ```
    Detected cluster — {N} related posts:
      [1] {title} ({score} pts) — MAIN
-     [2] {title} ({score} pts)
      ...
    Include all? [y] / select numbers [1,3,5] / [n] skip
    ```
-5. Otherwise → single post mode.
-6. User input sets cluster scope for Phase 1.
+5. else → single mode
+6. User input sets cluster scope
 
 ---
 
-## Phase 1 — Research (输入 → Research Document)
+## Phase 1 — Research (raw data → RD)
 
-### Cache strategy
+### Cache
+Prefer `_data/hn/`. Fallback `webfetch` only.
 
-Prefer cached data from `_data/hn/`. Fallback to `webfetch` only when cache unavailable.
-
-Cache file locations (replace `YYYY`/`WNN`/`{id}` as needed):
 | Data | Path | Key fields |
 |------|------|-----------|
-| Post metadata | `_data/hn/YYYY/WNN/{id}/post.yaml` | title, score, author, posted_at, raw_comment_count |
+| Post meta | `_data/hn/YYYY/WNN/{id}/post.yaml` | title, score, author, posted_at, raw_comment_count |
 | Comments | `_data/hn/YYYY/WNN/{id}/comments.yaml` | comments[].{id, author, text, score} |
 | Article | `_data/hn/YYYY/WNN/{id}/article.yaml` | title, fetch_status, content |
 
-Use `glob _data/hn/*/W*/` to find the week dir, then read files for the selected story id.
+Find week: `glob _data/hn/*/W*/`.
 
-### Step 1 — 确保原文内容充足
+### Step 1 — Article sufficiency
+Read `article.yaml`. Check `content` length:
+- `< 2000` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<url>" --timeout 30`
+- `2000..4000` → **SHOULD** run
+- `> 4000` → **MAY** proceed
 
-Read `article.yaml`. Check `content` field length:
-- `< 2000 chars` → **MUST** run `ruby scripts/hn-fetch.rb --fetch-article-url "<article_url>" --timeout 30` to attempt fuller fetch
-- `2000..4000 chars` → **SHOULD** run the same command
-- `> 4000 chars` → **MAY** proceed directly
+exit 0 → use stdout content. exit 1 → use cached.
 
-If the fetch succeeds (exit 0), use the stdout content as supplementary context.
-If it fails (exit 1), proceed with existing cached content.
+### Step 2 — Extract concrete details
+Read article. Extract specifics for 原文概要:
 
-### Step 2 — 精读原文，提取具体细节
+| Type | Extract | Why |
+|------|---------|-----|
+| 角色 | person name / role | story feel |
+| 数字 | %, $, time, count | precise > vague |
+| 产品功能 | feature name | "蜡烛按钮" >> "各种功能" |
+| 荒诞点 | absurd / irony / paradox | most memorable |
+| 情节 | cause → twist → outcome | narrative line |
 
-Read the article content. Extract concrete details worth referencing in 原文概要:
+> Output: **Details block** (~5-8 items, EN/CN mix ok)
 
-| 类别 | 提取什么 | 原因 |
-|------|---------|------|
-| 角色 | 人名 / 角色名 / 真实人物 | 让概要有故事感 |
-| 数字 | 百分比 / 金额 / 时间 / 数量 | 具体数字比"很多"有力 |
-| 产品功能 | 具体功能名称 / 特性 | 相比"各种功能","蜡烛按钮"更生动 |
-| 荒诞点 | 反常识 / 讽刺 / 矛盾 | 读完后最容易被记住的点 |
-| 关键情节 | 起因 → 转折 → 结局链条 | 概要需要一条叙事线 |
-
-> 这一步产出一个 **Details 块**（~5-8 条，中英夹杂没关系，供自己参考）
-
-### Step 3 — 分类评论，建立主题 + 引文池
-
-Read `comments.yaml` (top 100 by score). Group into 4-8 themes:
+### Step 3 — Theme + quote pool
+Read `comments.yaml` (top 100 by score). Group 4-8 themes:
 
 ```
-Theme: [主题名称] （热度: 🔥高/💬中/📎低）
-  立场: 支持 / 反对 / 中立 / 争议
-  引文候选:
-  - [comment:id] "quote" — username（赞成 or 反对）
-  - [comment:id] "quote" — username
-  关键观察: 这个主题的讨论有何独特性？
+Theme: [name] (热度: 🔥/💬/📎)
+  立场: for / against / neutral / split
+  candidates:
+  - [comment:id] "quote" — user
+  观察: what's unique about this theme?
 ```
 
-每条引文的 comment ID 必须记录（Phase 2.5 验证需要）。
+Record comment ID for each quote (Phase 2.5 verify).
 
-### Step 4 — 判断讨论结构
+### Step 4 — Discussion structure
+Identify:
+- Clear opposition (two camps)?
+- Personal experience (共鸣)?
+- Humor / parody side-thread?
+- Consensus or split?
 
-识别讨论的整体格局：
-- 是否存在明显争议（两派对立）？
-- 是否大量读者有亲身经历（共鸣帖）？
-- 是否存在幽默/讽刺/戏仿的副线？
-- 讨论是共识居多还是分裂居多？
+### Phase 1 output
 
-### Phase 1 产出
-
-将 Step 2-4 汇总为一个 **Research Document**（保留在上下文，不落盘）。结构：
+Merge Step 2-4 into **Research Document** (context only, no disk):
 
 ```
 —— Research Document ——
-【原文具体细节】  ← 来自 Step 2
+【原文具体细节】
 - 角色: ...
 - 数字: ...
 - 荒诞点: ...
-- 关键情节: ...
+- 情节: ...
 
-【主题分布】  ← 来自 Step 3
-- Theme 1: ...（引文: comment:id, comment:id）
+【主题分布】
+- Theme 1: ... (引文: comment:id)
 - Theme 2: ...
 
-【讨论结构】  ← 来自 Step 4
-- 争议焦点: ...
-- 情绪基调: ...
+【讨论结构】
+- 争议: ...
+- 情绪: ...
 —— RD END ——
 ```
 
-进入 Phase 2 前确认 Research Document 完整，不缺失关键主题。
+Verify RD complete before Phase 2. No missing key themes.
 
-### Single post mode
-同上 Step 2-4。
+### Single mode
+Same Step 2-4.
 
 ### Cluster mode
-1. Main post: top 20 comments by score
-2. Each related post: top 8 by score
-3. Track `thread_id` per quote (e.g. "[thread 2]")
-4. Research Document 标注每条引文的 thread 归属
+1. Main: top 20 comments by score
+2. Related: top 8 each
+3. Track `thread_id` per quote (e.g. `[thread 2]`)
+4. RD label each quote with thread
 
 ---
 
 ## Phase 2 — Write
 
-Load `chinese-writing-style` skill before writing.
-(引文原文不受 style 约束, 保持原样. 翻译和讨论段受约束.)
+Load `chinese-writing-style` first.
+(引文原文不受 style 约束. 翻译和讨论段受约束.)
 
-写作前**重新完整通读一遍 Research Document**，确保所有关键细节和引文都在工作记忆中。
+**Re-read full RD** before writing. Ensure all details + quotes in working memory.
 
 ### Front matter
 
@@ -199,73 +185,68 @@ title: "Topic — HN discussion digest"
 date: $(TZ=Asia/Shanghai date +%Y-%m-%d)
 categories: [articles]
 excerpt: >-
-  一句话摘要（1-2 句，~80 字）
+  1-2句, ~80字
 tagline: >-
-  浮夸版（不对外展示，搜索引擎可见）
+  浮夸版（不展示, 搜索引擎可见）
 ---
 ```
-⚠ `excerpt` / `tagline` 使用 YAML block scalar `>-`，内容中的 ASCII 双引号 `"` 会被 YAML 解析为字符串终止。若文本内需要引号，用中文书名号《》或转义 `\"`。
+⚠ `excerpt` / `tagline` use YAML block scalar `>-`. ASCII `"` terminates YAML. Use 《》 or `\"`.
 
-⚠ `date` must be auto-filled via `$(TZ=Asia/Shanghai date +%Y-%m-%d)`. Never enter manually.
+⚠ `date` via `$(TZ=Asia/Shanghai date +%Y-%m-%d)`. Never manual.
 
 ### excerpt rules
-| Article length | Style | Example |
-|----------------|-------|---------|
-| Short (<3000 chars) | One sentence, core insight | "每天 5 分钟深呼吸就能改变你做风险决策的方式。" |
-| Long (>=3000 chars) | Hook, most counterintuitive angle | "这个 0.2B 参数模型在图像修复任务上击败了 10B 级模型。" |
+| Length | Style | Example |
+|--------|-------|---------|
+| < 3k chars | Core insight | "每天 5 分钟深呼吸就能改变你做风险决策的方式。" |
+| >= 3k chars | Hook, counterintuitive | "0.2B 模型击败 10B 级模型。" |
 
-No hacky/clickbait: 震惊, 惊人, 万万没想到. Movies/books: spoiler-free, or prefix `⚠ 含剧透`.
+No clickbait: 震惊, 惊人, 万万没想到.
 
 ### tagline rules
+| Tone | Example |
+|------|---------|
+| 吐槽 | curl 维护者：黑客不休息？那我先休了。 |
+| FOMO | Anthropic 的护城河正在蒸发。 |
+| 金句 | 救火的被奖励，防火的被遗忘。 |
+| 直击 | 你只是想写个代码，Anthropic 却要你的护照照片。 |
+| 感性 | 全片台词不到十句，看完想给所有人打个电话。 |
+| 反讽 | 花最贵的钱，用最不确定的服务。 |
+| 脑洞 | 抓精灵时，Niantic 在帮你参军。 |
+| 悬念 | 中国电影史上最短的剧本：沿着城墙走，走不完的路。 |
 
-| Category | Tone | Example |
-|----------|------|---------|
-| 吐槽/调侃 | 轻松拆台式幽默 | curl 维护者：黑客不休息？那我先休了。 |
-| 卖焦虑/FOMO | 制造紧迫感 | Anthropic 的护城河正在蒸发，速度比你想象的要快。 |
-| 金句/格言体 | 短促有力 | 救火的被奖励，防火的被遗忘。这是组织的终极真相。 |
-| 直击本质 | 一句话戳穿 | 你只是想写个代码，Anthropic 却要你的护照照片。 |
-| 感性/催泪 | 温柔一刀 | 全片台词不到十句，看完想给所有人打个电话。 |
-| 反讽/黑色幽默 | 冷嘲热讽 | 花最贵的钱，用最不确定的服务——AI 时代的买椟还珠。 |
-| 脑洞/发散 | 跨域类比 | 你抓精灵的时候，Niantic 在帮你参军。 |
-| 短促/悬念 | 半句话勾起好奇 | 中国电影史上最短的剧本：沿着城墙走，走不完的路。 |
+Must anchor to facts. Never fabricate. Not displayed — indexed via `<a title="...">`.
 
-Must anchor to actual article facts (event/viewpoint). Never fabricate. Not displayed externally — lives in front matter, indexed via `<a title="...">`.
+### Quality rules
 
-### 写作质量要求
-
-写作时始终遵循以下三条：
-
-1. **具体优先于抽象** — 用"面包 33% 烤焦率"代替"产品存在问题"；用"蜡烛按钮、壁炉模式、斋月模式"代替"各种新功能"。Research Document 的 Details 块就是干这个的。
-
-2. **引文驱动讨论** — 每个讨论主题 section 至少展示一条引文（原文 + 翻译），引文是讨论焦点的核心载体。不要空泛归纳"很多读者认为"。
-
-3. **有叙事弧线** — 原文概要从起因到结局有一条完整线。总体情绪从分歧走向一个有力的退场句，避免平淡收尾。
+1. **Concrete > abstract** — "面包 33% 烤焦率" not "产品有问题". Use RD Details block.
+2. **Quote-driven** — each theme section >= 1 quote (EN + CN). No "很多读者认为".
+3. **Narrative arc** — 原文概要: cause → twist → outcome. 总体情绪: divergence → strong closing line.
 
 ### Article structure (fixed order)
-1. **原文概要** — context intro, 2-5 paragraphs. Note source: "HN 首页 (/news)" or "HN 热门榜 (/best)". 必须使用 Research Document 中的具体细节（人名、数字、产品功能），避免抽象概括。
-2. **讨论焦点** — key themes in `###` sections. Each blockquote followed by CN translation:
+1. **原文概要** — 2-5 paragraphs. Source: "HN 首页 (/news)" or "HN 热门榜 (/best)". Use RD specifics (names, numbers, features).
+2. **讨论焦点** — `###` sections. Each:
    ```
-   > "English text" — username
-   > （中文翻译）
+   > "text" — user
+   > （译文）
    ```
-   - Translation line: no attribution
-   - No blank line between quote and translation
-   - Cluster mode: attribution → `[thread #N]`
+   - Translation no attribution
+   - No blank between quote and translation
+   - Cluster: `[thread #N]`
 3. **典型观点一览** — table: 立场 / 用户 / 一句话
-4. **总体情绪** — 1-2 paragraphs, end with a strong closing line
-5. **引用帖子** — markdown table: # / 标题 / URL (auto-generated)
-6. **免责声明** — `<div class="disclaimer">` at bottom
+4. **总体情绪** — 1-2 paragraphs. End with strong closing line.
+5. **引用帖子** — table: # / 标题 / URL
+6. **免责声明** — `<div class="disclaimer">`
 
 ### Format rules
 
 | Rule | Example |
 |------|---------|
-| Quote + attribution same line | `> "text" — user` |
-| CN translation separate line | `> （译文）` |
-| Tech terms in backticks | `` `R1` ``, `` `BPEL` `` |
-| Product names NO backticks | LangChain, OpenAI, Claude |
-| General concepts NO backticks | agent, framework, API |
-| Source annotation (cluster) | `> "text" — user [thread 2]` |
+| Quote + user same line | `> "text" — user` |
+| CN trans separate line | `> （译文）` |
+| Tech terms `` ` `` | `` `R1` ``, `` `BPEL` `` |
+| Product names plain | LangChain, OpenAI, Claude |
+| General plain | agent, framework, API |
+| Cluster thread | `> "text" — user [thread 2]` |
 
 ### Naming
 `_articles/YYYY/YYYY-MM-DD-hn-keywords.md`
@@ -275,47 +256,44 @@ Append to disclaimer:
 ```
 <br><br><em>本摘要由 AI 模型辅助生成：{provider}/{model}</em>
 ```
-Must use actual model, e.g. `google/gemini-2.5-flash` or `deepseek/deepseek-v4-flash`.
-Never fabricate model name. If unsure, write literal `{provider}/{model}`.
+Use actual model (e.g. `google/gemini-2.5-flash`, `deepseek/deepseek-v4-flash`). Never fabricate.
 
 ---
 
-## Phase 2.5 — Fact Check + Revision (REQUIRED, no skip)
+## Phase 2.5 — Fact Check + Revise (REQUIRED)
 
-### Step 1 — 引文验证
-
+### Step 1 — Quote verify
 1. `webfetch` HN comment page (html) — `https://news.ycombinator.com/item?id={comment_id}`
-2. Locate comment: `<span class="commtext c00">`
-3. Compare rendered text vs article quote:
-   - Verbatim match (no paraphrase, no added detail)
-   - Username attribution must match
-   - Ellipsis (...) must not change original meaning
-   - CN translation must faithfully reflect EN intent
-4. Fix any flagged discrepancy
-5. Report: ✓ verified / ⚠ fixed / ✗ flagged
+2. Find: `<span class="commtext c00">`
+3. Check:
+   - Verbatim match (no paraphrase)
+   - Username match
+   - Ellipsis (...) preserved meaning
+   - CN translation faithful
+4. Fix mismatch
+5. Report: ✓ / ⚠ / ✗
 
-### Step 2 — 质量自审
+### Step 2 — Quality review
+Read full draft. Checklist:
 
-通读全文，Checklist:
+| # | Check | Pass |
+|---|-------|------|
+| 1 | 原文概要 specifc? | >= 3 RD items (names/numbers/features) |
+| 2 | 讨论焦点 quotes? | Each theme section >= 1 quote |
+| 3 | Concrete not vague? | No "很多人表示". Each sentence anchored. |
+| 4 | 观点表 covers split? | >= 4 rows, includes opposing views |
+| 5 | 总体情绪 closing? | Last line not repeat. Synthesize or punch. |
 
-| # | 检查项 | 通过条件 |
-|---|--------|---------|
-| 1 | 原文概要是否有具体细节？ | 包含至少 3 个 Research Document 中的具体项（人名/数字/功能名） |
-| 2 | 讨论焦点是否引文充分？ | 每个主题 section 至少 1 条引文 |
-| 3 | 整体语言是否具体而非空泛？ | 无"很多人表示"类批发表述，每句都锚定具体信息 |
-| 4 | 观点表是否覆盖主要争议？ | 至少 4 行，包含正反立场 |
-| 5 | 总体情绪是否有有力的退场句？ | 最后一句不只重复前文，而是收束或点睛 |
-
-有未通过的项 → 修改对应段落 → 重新检查。
+Fail any → revise section → re-check.
 
 ### Sensitivity scan
 
-After revision, scan article body (including blockquotes, excluding disclaimer) for sensitive terms:
+Scan body (exclude disclaimer) for:
 `[china/ccp/tiananmen/taiwan/tibet/xinjiang/hong kong]` + `[censorship/surveillance/human rights/propaganda]`
 
-| Hit found? | Action |
-|------------|--------|
-| Yes | Tag article `⚑ sensitive`. Continue to Phase 3 flagged path. |
+| Hit | Action |
+|-----|--------|
+| Yes | Tag `⚑ sensitive`. Go to Phase 3 flagged path. |
 | No | Normal path. |
 
 ---
@@ -323,26 +301,26 @@ After revision, scan article body (including blockquotes, excluding disclaimer) 
 ## Phase 3 — Output
 
 1. Save article to `_articles/`
-2. Validate date field:
+2. Validate date:
    - `grep "date: $(TZ=Asia/Shanghai date +%Y-%m-%d)"` article file
    - Match → continue
-   - Mismatch → error "date field mismatch", auto-correct to today
+   - Mismatch → correct to today
 3. Build:
-   - **Auto/CI mode**: Skip build (CI validates in a separate step, no Docker).
-   - **Interactive mode**: `make build` (Docker) — if fail, fix & rebuild (max 1 retry).
+   - **Auto/CI**: Skip (CI validates later).
+   - **Interactive**: `make build` — fail → fix → rebuild (max 1 retry).
 
-### Auto mode (--auto or CI)
-
-| Tag | Action |
-|-----|--------|
-| Normal (no tag) | `git add -A && git commit -m "feat: HN 自动摘要 $(TZ=Asia/Shanghai date +%Y-%m-%d)"` (CI will push) |
-| Flagged (`⚑` sensitive or `⚑` political context) | Add extended disclaimer line: "This article involves topics of public debate. Content presented for informational purposes only." → commit same as normal + show warning: "⚠ Sensitive article deployed. Review recommended." |
-
-Exit 0 on success. No user prompts.
-
-### Interactive mode (no --auto)
+### Auto mode
 
 | Tag | Action |
 |-----|--------|
-| Normal (no tag) | Ask deploy? → yes → invoke auto-deploy skill |
-| Flagged (`⚑` sensitive or `⚑` political context) | Show: "⚠ Sensitive topics detected. Extended disclaimer added. Review required." Show matched terms. Add extended disclaimer. Ask "Confirm deploy? [y/N]" (default NO). y → deploy with extended disclaimer. N → article stays local, not committed. |
+| Normal | `git add -A && git commit -m "feat: HN 自动摘要 $(TZ=Asia/Shanghai date +%Y-%m-%d)"` (CI pushes) |
+| ⚑ sensitive/political | Add extended disclaimer → commit same + warning: "⚠ Review recommended." |
+
+Exit 0. No prompts.
+
+### Interactive mode
+
+| Tag | Action |
+|-----|--------|
+| Normal | Ask deploy? yes → invoke auto-deploy skill |
+| ⚑ sensitive/political | Show matched terms. Add extended disclaimer. Ask "Confirm deploy? [y/N]" (default N). y → deploy. N → stay local. |
