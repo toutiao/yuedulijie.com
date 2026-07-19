@@ -74,6 +74,20 @@ sass:
   sass_dir: _sass/
   style: compressed
 
+exclude:
+  - .hn-articles-checksum
+  - AGENTS.md
+  - Dockerfile
+  - docker-compose.yml
+  - Makefile
+  - opencode.jsonc
+  - playwright-renderer/
+  - scripts/
+  - _site/
+  - .github/
+  - .opencode/
+  - .env
+
 compress_html:
   clippings: []
   comments: []
