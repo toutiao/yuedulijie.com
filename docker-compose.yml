@@ -51,6 +51,7 @@ services:
     image: yuedulijie-renderer:latest
     network_mode: host
     restart: unless-stopped
+    init: true
     environment:
       - http_proxy=http://127.0.0.1:64540
       - https_proxy=http://127.0.0.1:64540
