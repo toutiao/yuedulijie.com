@@ -151,7 +151,7 @@ jobs:
             echo "state=clean" >> $GITHUB_OUTPUT
           fi
 
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v7
         if: steps.git-state.outputs.state != 'clean'
         with:
           commit_message: "feat: HN 自动摘要 $(TZ=Asia/Shanghai date +%Y-%m-%d)"
