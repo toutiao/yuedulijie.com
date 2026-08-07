@@ -9,7 +9,7 @@ on:
         description: "AI 模型"
         type: choice
         required: false
-        default: "deepseek/deepseek-v4-flash"
+        default: "google/gemini-3.5-flash"
         options:
           - "google/gemini-2.5-flash"
           - "google/gemini-2.5-flash-lite"
