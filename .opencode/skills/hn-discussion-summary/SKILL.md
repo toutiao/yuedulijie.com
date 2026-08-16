@@ -126,7 +126,8 @@ Load `chinese-writing-style` first.
 ```
 ---
 layout: post
-title: "Topic — HN discussion digest"
+title: >-
+  Topic — HN discussion digest
 date: $(TZ=Asia/Shanghai date +%Y-%m-%d)
 categories: [articles]
 excerpt: >-
@@ -135,7 +136,7 @@ tagline: >-
   浮夸版（不展示, 搜索引擎可见）
 ---
 ```
-⚠ `excerpt` / `tagline` use YAML block scalar `>-`. ASCII `"` terminates YAML. Use 《》 or `\"`.
+⚠ `title` / `excerpt` / `tagline` MUST use YAML block scalar `>-`. ASCII `"` terminates any double-quoted YAML scalar (breaks the whole front matter). Use 《》 or `\"` for inner quotes. Never use full-width `＞`.
 
 ⚠ `date` via `$(TZ=Asia/Shanghai date +%Y-%m-%d)`. Never manual.
 
@@ -250,8 +251,9 @@ Scan body (exclude disclaimer) for:
    - `grep "date: $(TZ=Asia/Shanghai date +%Y-%m-%d)"` article file
    - Match → continue
    - Mismatch → correct to today
+   - Re-read front matter: `title`/`excerpt`/`tagline` are `>-` block scalars, no double-quoted scalar containing ASCII `"`. Bad → fix → re-check.
 3. Build:
-   - **Auto/CI**: Skip (CI validates later).
+   - **Auto/CI**: Skip (CI runs front matter lint + one-shot auto-repair before commit).
    - **Interactive**: `make build` — fail → fix → rebuild (max 1 retry).
 
 ### Auto mode

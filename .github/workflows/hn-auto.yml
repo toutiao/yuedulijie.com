@@ -46,7 +46,6 @@ jobs:
           fetch-depth: 1
 
       - uses: ruby/setup-ruby@v1
-        if: ${{ inputs.force_fetch == 'true' }}
         with:
           ruby-version: "3.2"
           bundler-cache: true
@@ -124,6 +123,12 @@ jobs:
           opencode run "$HN_CMD" --dir . \
             --dangerously-skip-permissions \
             --model "$MODEL" 2>&1
+
+      - name: Validate & auto-repair article front matter (one-shot)
+        env:
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: ruby scripts/hn-repair.rb
 
       - name: Show changes
         run: |
